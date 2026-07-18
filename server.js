@@ -5,12 +5,16 @@ const app = express();
 const bcrypt = require('bcrypt');
 const multer = require("multer");
 const path = require("path");
-const fs = require("fs");
+const fs = require("fs").promises;
 const sharp = require("sharp");
 const crypto = require("crypto");
 const nodemailer = require("nodemailer");
 const isPasswordValid = require("./utils/passwordValidator");
 const hashPassword = require("./utils/passwordHasher");
+const generateToken = require("./utils/generateToken");
+const authMiddleware = require("./middleware/authMiddleware");
+const optionalAuthMiddleware = require("./middleware/optionalAuthMiddleware");
+const {loadLanguages, isLanguageValid} = require("./utils/languageValidator");
 require('dotenv').config();
 app.use(express.json());
 app.use(cors());
@@ -36,23 +40,14 @@ connection.connect((err) => {
         console.log("Error connecting to database. Error: "+err);
     }else{
         console.log("Connected to database");
+        loadLanguages(connection);
     }
 })
 
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        cb(null, "uploads/"); // folder gdzie zapisują się zdjęcia
-    },
-    filename: (req, file, cb) => {
-        const uniqueName = Date.now() + path.extname(file.originalname);
-        cb(null, uniqueName);
-    }
-});
-
 const upload = multer({
-    storage,
+    storage: multer.memoryStorage(),
     limits: {
-        fileSize: 2 * 1024 * 1024 // 2MB
+        fileSize: 2 * 1024 * 1024
     },
     fileFilter: (req, file, cb) => {
 
@@ -63,6 +58,7 @@ const upload = multer({
         cb(null, true);
     }
 });
+
 
 
 app.post('/checkLoginData', (req, res) => {
@@ -82,11 +78,13 @@ app.post('/checkLoginData', (req, res) => {
                 }else if(result === false) {
                    return res.json({message: "Invalid email or password"});
                 }else{
+
+                    const token = generateToken(users[0]);
+
                     delete users[0].password;
-                   return res.json({
-                       message: "Logged in successfully",
-                       user: users[0]
-                   });
+
+                    return res.json({message: "Logged in successfully", token, user: users[0]});
+
                 }
             })
         }
@@ -132,33 +130,31 @@ app.post('/addUser', async (req, res) => {
     }
 })
 
-app.post('/getFilms', (req, res) => {
-    const {userId} = req.body;
+app.post('/getFilms', optionalAuthMiddleware, (req, res) => {
 
-    if (!userId) {
-        return connection.query('SELECT films.id, films.poster_url, films.rating, films.release_date, films.duration, film_translations.title, film_translations.description FROM films INNER JOIN film_translations ON films.id = film_translations.film_id INNER JOIN languages ON film_translations.language_code = languages.code WHERE languages.code = "en"',(err, result) => {
+    const userId = req.user?.id || null;
+    let language = req.body.language || "en";
+
+    if (!isLanguageValid(language)) {
+        language = "en";
+    }
+
+    connection.query(
+        "SELECT films.id, films.poster_url, films.rating, films.release_date, films.duration, film_translations.title, film_translations.description, user_favorites.film_id, user_watched.film_id AS watchedFilmId FROM films INNER JOIN film_translations ON films.id = film_translations.film_id LEFT JOIN user_favorites ON films.id = user_favorites.film_id AND user_favorites.user_id = ? LEFT JOIN user_watched ON films.id = user_watched.film_id AND user_watched.user_id = ? WHERE film_translations.language_code = ?", [userId, userId, language], (err, result) => {
+
             if (err) {
-                return  res.json({message: "Error getting films. Error: "+err});
-            }else if(result){
-                return res.json({message:"Films got successfully",body:result});
+                return res.json({message:"Error getting films. Error: "+err});
             }
-        })
-    }
-    return connection.query("SELECT films.id, films.poster_url, films.rating, films.release_date, films.duration, film_translations.title, film_translations.description, user_favorites.film_id, user_watched.film_id AS watchedFilmId FROM films INNER JOIN film_translations ON films.id = film_translations.film_id INNER JOIN languages ON film_translations.language_code = languages.code INNER JOIN users ON languages.code = users.language_code LEFT JOIN user_favorites ON films.id = user_favorites.film_id AND user_favorites.user_id = users.id LEFT JOIN user_watched ON films.id = user_watched.film_id AND user_watched.user_id = users.id WHERE users.id = ?",[userId],(err, result) => {
-        if (err) {
-            return  res.json({message: "Error getting films. Error: "+err});
-        }else if(result){
-            return res.json({message:"Films got successfully",body:result});
+
+            return res.json({message:"Films got successfully", body:result});
         }
-    })
-})
+    );
 
-app.post("/likeToggle", (req, res) => {
-    const {filmId,userId} = req.body;
+});
 
-    if (!userId) {
-        return res.json({message: "You are not logged in!"});
-    }
+app.post("/likeToggle",authMiddleware, (req, res) => {
+    const {filmId} = req.body;
+    const userId = req.user.id;
 
     if (!filmId){
         return res.json({message: "Something went wrong!"});
@@ -189,12 +185,9 @@ app.post("/likeToggle", (req, res) => {
     })
 })
 
-app.post("/watchedToggle", (req, res) => {
-    const {filmId,userId} = req.body;
-
-    if (!userId) {
-        return res.json({message: "You are not logged in!"});
-    }
+app.post("/watchedToggle",authMiddleware, (req, res) => {
+    const {filmId} = req.body;
+    const userId = req.user.id;
 
     if (!filmId){
         return res.json({message: "Something went wrong!"});
@@ -224,11 +217,8 @@ app.post("/watchedToggle", (req, res) => {
         }
     })
 })
-app.post("/likedGet", (req, res) => {
-    const {userId} = req.body;
-    if (!userId) {
-        return res.json({message: "You are not logged in!"});
-    }
+app.post("/likedGet",authMiddleware, (req, res) => {
+    const userId = req.user.id
 
     connection.query("SELECT films.id, films.poster_url, films.rating, films.release_date, films.duration, film_translations.title, film_translations.description, user_watched.film_id AS watchedFilmId FROM user_favorites INNER JOIN films ON user_favorites.film_id = films.id INNER JOIN film_translations ON films.id = film_translations.film_id LEFT JOIN user_watched ON films.id = user_watched.film_id AND user_watched.user_id = user_favorites.user_id WHERE user_favorites.user_id = ? AND film_translations.language_code = (SELECT language_code FROM users WHERE id = ?)",[userId,userId],(err, result) => {
         if (err) {
@@ -240,11 +230,8 @@ app.post("/likedGet", (req, res) => {
     })
 })
 
-app.post("/watchedGet", (req, res) => {
-    const {userId} = req.body;
-    if (!userId) {
-        return res.json({message: "You are not logged in!"});
-    }
+app.post("/watchedGet",authMiddleware, (req, res) => {
+    const userId = req.user.id;
 
     connection.query("SELECT films.id, films.poster_url, films.rating, films.release_date, films.duration, film_translations.title, film_translations.description, user_favorites.film_id AS userFavoritesFilms FROM user_watched INNER JOIN films ON user_watched.film_id = films.id INNER JOIN film_translations ON films.id = film_translations.film_id LEFT JOIN user_favorites ON films.id = user_favorites.film_id AND user_favorites.user_id = user_watched.user_id WHERE user_watched.user_id = ? AND film_translations.language_code = (SELECT language_code FROM users WHERE id = ?)",[userId,userId],(err, result) => {
         if (err) {
@@ -256,12 +243,8 @@ app.post("/watchedGet", (req, res) => {
     })
 })
 
-app.post("/getUserData", (req, res) => {
-    const {userId} = req.body;
-
-    if (!userId) {
-        return res.json({message: "You are not logged in!"});
-    }
+app.post("/getUserData", authMiddleware, (req, res) => {
+    const userId = req.user.id;
 
     connection.query("SELECT `username`, `avatar_url`, `email`, `created_at`, `role`, `bio`, `language_code` FROM users WHERE users.id = ?",[userId],(err, result) => {
         if (err) {
@@ -285,12 +268,9 @@ app.get("/getLanguageCodes", (req, res) => {
     })
 })
 
-app.post("/editUserBio", (req, res) => {
-    const {userId,userBio} = req.body;
-
-    if (!userId) {
-        return res.json({message: "You are not logged in!"});
-    }
+app.post("/editUserBio", authMiddleware, (req, res) => {
+    const userId = req.user.id;
+    const {userBio} = req.body;
 
     connection.query("UPDATE users SET users.bio=? WHERE users.id = ?",[userBio,userId],(err, result) => {
         if (err) {
@@ -302,11 +282,17 @@ app.post("/editUserBio", (req, res) => {
     })
 })
 
-app.post("/changeUserLanguage", (req, res) => {
-    const {userId,userLanguageCode} = req.body;
+app.post("/changeUserLanguage", authMiddleware, (req, res) => {
+    const userId = req.user.id;
+    const {userLanguageCode} = req.body;
 
-    if (!userId) {
-        return res.json({message: "You are not logged in!"});
+
+    if (!userLanguageCode) {
+        return res.json({message: "Language code is missing"});
+    }
+
+    if (!isLanguageValid(userLanguageCode)) {
+        return res.json({message: "This language is not available"});
     }
 
     connection.query("UPDATE `users` SET `language_code`= ? WHERE users.id = ?",[userLanguageCode,userId],(err, result) => {
@@ -319,12 +305,10 @@ app.post("/changeUserLanguage", (req, res) => {
     })
 })
 
-app.post("/editUserName", (req, res) => {
-    const {userId,userName} = req.body;
+app.post("/editUserName", authMiddleware, (req, res) => {
+    const userId = req.user.id;
+    const {userName} = req.body;
 
-    if (!userId) {
-        return res.json({message: "You are not logged in!"});
-    }
     if (!userName) {
         return res.json({message: "New user name is empty"});
     }
@@ -351,73 +335,87 @@ app.use((err, req, res, next) => {
     next();
 });
 
-app.post("/uploadAvatar", upload.single("avatar"), async (req, res) => {
+app.post("/uploadAvatar", authMiddleware, upload.single("avatar"), async (req, res) => {
 
-    const userId = req.body.userId;
-
-    if (!userId) {
-        return res.json({ message: "Not logged in" });
-    }
+    const userId = req.user.id;
 
     if (!req.file) {
         return res.json({ message: "No file uploaded" });
     }
 
-    const inputPath = req.file.path;
 
-    const fileName = Date.now() + ".webp";
+
+    const fileName = crypto.randomBytes(16).toString("hex") + ".webp";
     const outputPath = path.join(__dirname, "uploads", fileName);
 
     try {
-        await sharp(inputPath)
+
+        await sharp(req.file.buffer)
             .resize(300, 300, { fit: "cover" })
             .webp({ quality: 80 })
             .toFile(outputPath);
 
-        fs.unlink(inputPath, () => {});
 
         const newAvatarUrl = "/uploads/" + fileName;
 
-        connection.query(
-            "SELECT avatar_url FROM users WHERE id = ?",
-            [userId],
-            (err, result) => {
 
-                const oldAvatar = result?.[0]?.avatar_url;
+        connection.query("SELECT avatar_url FROM users WHERE id = ?", [userId], async (err, result) => {
 
-                if (oldAvatar && oldAvatar.startsWith("/uploads/")) {
-                    const oldPath = path.join(
-                        __dirname,
-                        oldAvatar.replace("/uploads/", "uploads/")
-                    );
-
-                    fs.unlink(oldPath, () => {});
+                if (err) {
+                    return res.json({message:"Database error"});
                 }
 
-                connection.query("UPDATE users SET avatar_url = ? WHERE id = ?", [newAvatarUrl, userId], (err2) => {
-                        if (err2) {
-                            return res.json({ message: "DB update error" });
+                const oldAvatar = result[0]?.avatar_url;
+
+                if(oldAvatar && oldAvatar.startsWith("/uploads/")) {
+
+                    const oldPath = path.join(
+                        __dirname,
+                        oldAvatar
+                    );
+
+                    try {
+                        await fs.unlink(oldPath);
+                    }
+                    catch(err) {
+                        if (err.code !== "ENOENT") {
+                            console.error("Error deleting old avatar:", err);
+                        }
+                    }
+                }
+
+
+                connection.query("UPDATE users SET avatar_url=? WHERE id=?", [newAvatarUrl, userId], (err2)=>{
+
+                        if(err2){
+                            return res.json({message:"DB update error"});
                         }
 
-                        return res.json({
-                            message: "Avatar updated successfully",
-                            avatar_url: newAvatarUrl
-                        });
+                        res.json({message:"Avatar updated successfully", avatar_url:newAvatarUrl});
                     }
                 );
+
             }
         );
+    } catch(err){
 
-    } catch (err) {
-        return res.json({ message: "Image processing failed", error: err.message });
+        console.log(err);
+
+        res.json({message:"Image processing failed", error:err.message});
     }
+
 });
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
-app.get("/getFilm/:id", (req, res) => {
+app.get("/getFilm/:id", optionalAuthMiddleware, (req, res) => {
+
     const filmId = req.params.id;
-    const languageCode = req.query.language || "en";
-    const userId = parseInt(req.query.userId);
+    let languageCode = req.query.language || "en";
+    const userId = req.user?.id || null;
+
+    if (!isLanguageValid(languageCode)) {
+        languageCode = "en";
+    }
 
     if (!filmId) {
         return res.json({ message: "Error id is missing" });
