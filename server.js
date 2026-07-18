@@ -14,6 +14,7 @@ const hashPassword = require("./utils/passwordHasher");
 const generateToken = require("./utils/generateToken");
 const authMiddleware = require("./middleware/authMiddleware");
 const optionalAuthMiddleware = require("./middleware/optionalAuthMiddleware");
+const adminMiddleware = require("./middleware/adminMiddleware");
 const {loadLanguages, isLanguageValid} = require("./utils/languageValidator");
 require('dotenv').config();
 app.use(express.json());
@@ -564,6 +565,29 @@ app.post("/resetPassword/:token", async (req,res) => {
         }
     );
 });
+
+app.get("/getUsers",authMiddleware,adminMiddleware, (req, res) => {
+    connection.query("SELECT `id`, `username`, `avatar_url`, `email`, `created_at`, `role`, `status`,`language_code`, languages.name AS \"language\" FROM `users` LEFT JOIN languages ON users.language_code = languages.code ORDER BY users.id",(err, result) => {
+        if (err){
+            return res.status(500).json({message:"Database error",success:false});
+        }
+
+        return res.json({message: "Users fetched successfully", users: result, success: true});
+
+    })
+})
+
+app.get("/getUsersCount", authMiddleware, adminMiddleware, (req,res) => {
+    connection.query("SELECT COUNT(id) AS users_count FROM users", (err,result) => {
+            if(err){
+                return res.status(500).json({message:"Database error", success:false});
+            }
+
+            return res.json({users_count: result[0].users_count,success:true});
+        }
+    );
+});
+
 
 app.listen(process.env.PORT, () => {
     console.log(`Server started on port ${process.env.PORT}`);
