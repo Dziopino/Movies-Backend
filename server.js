@@ -95,7 +95,14 @@ app.post('/addUser', async (req, res) => {
     const {username, email, password} = req.body;
 
     if (!username || !email || !password) {
-        return res.json({message: "Invalid input data"});
+        return res.json({message: "Invalid input data",success:false});
+    }
+
+    if (!isPasswordValid(password)) {
+        return res.status(400).json({
+            message:"Password does not meet requirements",
+            success:false
+        });
     }
 
     try {
@@ -106,20 +113,27 @@ app.post('/addUser', async (req, res) => {
             "INSERT INTO `users`(`password`, `username`, `email`) VALUES (?,?,?)", [hash, username, email], (err, result) => {
 
                 if (err) {
-                    return res.json({message: "Error while registering. Error: " + err});
+                    if (err.code === "ER_DUP_ENTRY") {
+                        return res.json({message:"Email already exists",success:false});
+                    }
+
+                    return res.json({message:"Error while registering",success:false});
                 }
 
                 const insertedId = result.insertId;
 
                 connection.query("SELECT users.id, users.password, users.username, users.avatar_url, users.email, users.created_at, users.role, users.bio, users.language_code FROM users WHERE users.id = ?", [insertedId], (err, user) => {
 
-                        if (err) {
-                            return res.json({message: "Error while registering. Error: " + err});
-                        }
-
-                        res.json({message: "Registered successfully", user: user[0]});
+                    if (err) {
+                        return res.json({message: "Error while registering. Error: " + err,success:false});
                     }
-                );
+
+                    const token = generateToken(user[0]);
+
+                    delete user[0].password;
+
+                    res.json({message:"Registered successfully", token, user:user[0],success:true});
+                });
             }
         );
 
@@ -220,7 +234,7 @@ app.post("/watchedToggle",authMiddleware, (req, res) => {
 app.post("/likedGet",authMiddleware, (req, res) => {
     const userId = req.user.id
 
-    connection.query("SELECT films.id, films.poster_url, films.rating, films.release_date, films.duration, film_translations.title, film_translations.description, user_watched.film_id AS watchedFilmId FROM user_favorites INNER JOIN films ON user_favorites.film_id = films.id INNER JOIN film_translations ON films.id = film_translations.film_id LEFT JOIN user_watched ON films.id = user_watched.film_id AND user_watched.user_id = user_favorites.user_id WHERE user_favorites.user_id = ? AND film_translations.language_code = (SELECT language_code FROM users WHERE id = ?)",[userId,userId],(err, result) => {
+    connection.query("SELECT films.id, films.poster_url, films.rating, films.release_date, films.duration, film_translations.title, film_translations.description, user_watched.film_id AS watchedFilmId FROM user_favorites INNER JOIN films ON user_favorites.film_id = films.id INNER JOIN film_translations ON films.id = film_translations.film_id LEFT JOIN user_watched ON films.id = user_watched.film_id AND user_watched.user_id = user_favorites.user_id WHERE user_favorites.user_id = ? AND film_translations.language_code = (SELECT language_code FROM users WHERE id = ?) ORDER BY user_favorites.created_at DESC",[userId,userId],(err, result) => {
         if (err) {
             return res.json({message: "Error while getting favorites. Error: "+err});
         }
@@ -233,7 +247,7 @@ app.post("/likedGet",authMiddleware, (req, res) => {
 app.post("/watchedGet",authMiddleware, (req, res) => {
     const userId = req.user.id;
 
-    connection.query("SELECT films.id, films.poster_url, films.rating, films.release_date, films.duration, film_translations.title, film_translations.description, user_favorites.film_id AS userFavoritesFilms FROM user_watched INNER JOIN films ON user_watched.film_id = films.id INNER JOIN film_translations ON films.id = film_translations.film_id LEFT JOIN user_favorites ON films.id = user_favorites.film_id AND user_favorites.user_id = user_watched.user_id WHERE user_watched.user_id = ? AND film_translations.language_code = (SELECT language_code FROM users WHERE id = ?)",[userId,userId],(err, result) => {
+    connection.query("SELECT films.id, films.poster_url, films.rating, films.release_date, films.duration, film_translations.title, film_translations.description, user_favorites.film_id AS userFavoritesFilms FROM user_watched INNER JOIN films ON user_watched.film_id = films.id INNER JOIN film_translations ON films.id = film_translations.film_id LEFT JOIN user_favorites ON films.id = user_favorites.film_id AND user_favorites.user_id = user_watched.user_id WHERE user_watched.user_id = ? AND film_translations.language_code = (SELECT language_code FROM users WHERE id = ? ) ORDER BY user_watched.watched_at DESC",[userId,userId],(err, result) => {
         if (err) {
             return res.json({message: "Error while getting watched. Error: "+err});
         }
