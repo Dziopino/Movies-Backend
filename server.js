@@ -67,26 +67,38 @@ app.post('/checkLoginData', (req, res) => {
     if (!email || !password) {
        return res.json({message: "Invalid email or password"});
     }
-    connection.query("SELECT users.id, users.password, users.username, users.avatar_url, users.email, users.created_at, users.role, users.bio, users.language_code FROM users WHERE users.email = ?", [email],(err, users) => {
+    connection.query("SELECT users.id, users.password, users.username, users.avatar_url, users.email, users.created_at, users.role, users.bio, users.language_code, users.status, users.suspended_until FROM users WHERE users.email = ?", [email],(err, users) => {
         if (err) {
-           return res.json({message: "Error getting users. Error: "+err});
+           return res.json({message: "Database error", success: false});
         }else if(users.length === 0) {
-           return res.json({message: "Invalid email or password"});
+           return res.json({message: "Invalid email or password", success: false});
         }else if(users.length === 1) {
             bcrypt.compare(password, users[0].password, (err, result) => {
                 if (err) {
-                   return res.json({message: "Error bcrypt. Error: "+err});
-                }else if(result === false) {
-                   return res.json({message: "Invalid email or password"});
-                }else{
+                   return res.json({message: "Hashing password failed", success: false});
+                }
+
+                if(result === false) {
+                   return res.json({message: "Invalid email or password", success: false});
+                }
+
+                if(users[0].status === "BANNED") {
+                    return res.json({message: "Account banned", success: false, banned:true});
+                }
+
+                if(users[0].status === "SUSPENDED") {
+                    if (new Date(users[0].suspended_until) > new Date()) {
+                        return res.json({message: "Account suspended", success: false, suspended: true, suspendedUntil: users[0].suspended_until});
+                    }
+                }
 
                     const token = generateToken(users[0]);
 
                     delete users[0].password;
 
-                    return res.json({message: "Logged in successfully", token, user: users[0]});
+                    return res.json({message: "Logged in successfully", token, user: users[0], success: true});
 
-                }
+
             })
         }
     })
@@ -566,16 +578,41 @@ app.post("/resetPassword/:token", async (req,res) => {
     );
 });
 
-app.get("/getUsers",authMiddleware,adminMiddleware, (req, res) => {
-    connection.query("SELECT `id`, `username`, `avatar_url`, `email`, `created_at`, `role`, `status`,`language_code`, languages.name AS \"language\" FROM `users` LEFT JOIN languages ON users.language_code = languages.code ORDER BY users.id",(err, result) => {
-        if (err){
-            return res.status(500).json({message:"Database error",success:false});
+app.get("/getUsers", authMiddleware, adminMiddleware, (req, res) => {
+
+    const page = Number(req.query.page) || 1;
+    const limit = 25;
+    const offset = (page - 1) * limit;
+
+
+    connection.query(
+        "SELECT id, username, avatar_url, email, created_at, role, status, language_code FROM users LIMIT ? OFFSET ?", [limit, offset], (err, result) => {
+
+            if(err){
+                return res.json({success:false, message:"Database error"});
+            }
+
+
+            connection.query("SELECT COUNT(id) AS count FROM users", (err, countResult)=>{
+
+                    if(err){
+                        return res.json({
+                            success:false,
+                            message:"Database error"
+                        });
+                    }
+
+                    const totalPages = Math.ceil(countResult[0].count / limit);
+
+
+                    return res.json({success:true, users:result, totalPages});
+
+                }
+            );
         }
+    );
 
-        return res.json({message: "Users fetched successfully", users: result, success: true});
-
-    })
-})
+});
 
 app.get("/getUsersCount", authMiddleware, adminMiddleware, (req,res) => {
     connection.query("SELECT COUNT(id) AS users_count FROM users", (err,result) => {
@@ -587,6 +624,159 @@ app.get("/getUsersCount", authMiddleware, adminMiddleware, (req,res) => {
         }
     );
 });
+
+app.get("/refreshUser/:userId", authMiddleware, adminMiddleware, (req, res) => {
+    const userId = req.params.userId;
+    if (!userId) {
+        return res.json({message:"No user found", success: false});
+    }
+    connection.query("SELECT `id`, `username`, `avatar_url`, `email`, `created_at`, `role`, `status`,`language_code`, languages.name AS \"language\" FROM `users` LEFT JOIN languages ON users.language_code = languages.code WHERE users.id = ?",[userId],(err, result) => {
+        if (err){
+            return res.status(500).json({message:"Database error",success:false});
+        }
+        if(result.affectedRows === 0){
+            return res.json({
+                success:false,
+                message:"User not found"
+            });
+        }
+
+        return res.json({message: "User fetched successfully", user: result[0], success: true});
+
+    })
+})
+
+app.post("/banUser", authMiddleware, adminMiddleware, (req,res) => {
+    const {userId,userStatus,banReason} = req.body;
+
+    const banBy = req.user.id;
+
+
+    if (!userId) {
+        return res.json({message:"No user found", success: false});
+    }
+
+    if (!banReason) {
+        return res.json({message:"Enter ban reason", success: false});
+    }
+
+    if(userStatus === "BANNED"){
+        return res.json({message:"User is already banned", success: false});
+    }
+
+    connection.query(`UPDATE users SET status = "BANNED", suspended_until = NULL,suspend_reason = NULL, suspended_at = NULL,suspended_by = NULL, ban_reason = ?, banned_at = NOW(), banned_by = ? WHERE id = ?`,[banReason,banBy,userId],(err, result) => {
+        if (err){
+            return res.status(500).json({message:"Database error",success:false});
+        }
+        if(result.affectedRows === 0){
+            return res.json({
+                success:false,
+                message:"User not found"
+            });
+        }
+
+        return res.json({message: "User banned successfully", success: true});
+
+    })
+})
+
+app.post("/suspendUser", authMiddleware, adminMiddleware, (req,res) => {
+    const {userId,userStatus,suspendReason,suspendUntil} = req.body;
+
+    const suspendBy = req.user.id;
+
+    if (!suspendReason) {
+        return res.json({message:"Enter suspend reason", success: false});
+    }
+
+    if (!suspendUntil) {
+        return res.json({message:"Enter date until user will be banned", success: false});
+    }
+
+    if (!userId) {
+        return res.json({message:"No user found", success: false});
+    }
+
+    if(userStatus === "SUSPENDED"){
+        return res.json({message:"User is already suspended", success: false});
+    }
+
+    if (new Date(suspendUntil) <= new Date()) {
+        return res.json({
+            success: false,
+            message: "Suspend date must be in the future"
+        });
+    }
+
+    connection.query(`UPDATE users SET status = "SUSPENDED", suspended_until = ? ,suspend_reason = ?, suspended_at = NOW(),suspended_by = ?, ban_reason = NULL, banned_at = NULL, banned_by = NULL WHERE id = ?`,[suspendUntil, suspendReason, suspendBy, userId],(err,result) => {
+        if (err){
+            return res.status(500).json({message:"Database error",success:false});
+        }
+        if(result.affectedRows === 0){
+            return res.json({
+                success:false,
+                message:"User not found"
+            });
+        }
+
+        return res.json({message: "User suspended successfully", success: true});
+
+    })
+})
+
+app.post("/unBanUser", authMiddleware, adminMiddleware, (req,res) => {
+    const {userId,userStatus} = req.body;
+
+    if (!userId) {
+        return res.json({message:"No user found", success: false});
+    }
+
+    if(userStatus !== "BANNED"){
+        return res.json({message:"User is not banned", success: false});
+    }
+
+    connection.query(`UPDATE users SET status = "ACTIVE", ban_reason = NULL, banned_at = NULL, banned_by = NULL WHERE id = ?`,[userId],(err,result) => {
+        if (err){
+            return res.status(500).json({message:"Database error",success:false});
+        }
+        if(result.affectedRows === 0){
+            return res.json({
+                success:false,
+                message:"User not found"
+            });
+        }
+
+        return res.json({message: "User unbanned successfully", success: true});
+
+    })
+})
+
+app.post("/unSuspendUser", authMiddleware, adminMiddleware, (req,res) => {
+    const {userId,userStatus} = req.body;
+
+    if (!userId) {
+        return res.json({message:"No user found", success: false});
+    }
+
+    if(userStatus !== "SUSPENDED"){
+        return res.json({message:"User is not suspended", success: false});
+    }
+
+    connection.query(`UPDATE users SET status = "ACTIVE", suspended_until = NULL, suspend_reason = NULL, suspended_at = NULL, suspended_by = NULL WHERE id = ?`,[userId],(err, result) => {
+        if (err){
+            return res.status(500).json({message:"Database error",success:false});
+        }
+        if(result.affectedRows === 0){
+            return res.json({
+                success:false,
+                message:"User not found"
+            });
+        }
+
+        return res.json({message: "User unsuspended successfully", success: true});
+
+    })
+})
 
 
 app.listen(process.env.PORT, () => {
