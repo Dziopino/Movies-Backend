@@ -9,6 +9,7 @@ const fs = require("fs").promises;
 const sharp = require("sharp");
 const crypto = require("crypto");
 const nodemailer = require("nodemailer");
+const connection = require("./database");
 const isPasswordValid = require("./utils/passwordValidator");
 const hashPassword = require("./utils/passwordHasher");
 const generateToken = require("./utils/generateToken");
@@ -16,17 +17,11 @@ const authMiddleware = require("./middleware/authMiddleware");
 const optionalAuthMiddleware = require("./middleware/optionalAuthMiddleware");
 const adminMiddleware = require("./middleware/adminMiddleware");
 const {loadLanguages, isLanguageValid} = require("./utils/languageValidator");
+const checkIfUserIsAdmin = require("./utils/checkIfUserIsAdmin");
 require('dotenv').config();
 app.use(express.json());
 app.use(cors());
 
-
-const connection = mysql.createConnection({
-    host: process.env.DB_HOST,
-    user: process.env.DB_USER,
-    password: process.env.DB_PASSWORD,
-    database: process.env.DB_NAME,
-})
 
 const transporter = nodemailer.createTransport({
     service: "gmail",
@@ -89,6 +84,10 @@ app.post('/checkLoginData', (req, res) => {
                 if(users[0].status === "SUSPENDED") {
                     if (new Date(users[0].suspended_until) > new Date()) {
                         return res.json({message: "Account suspended", success: false, suspended: true, suspendedUntil: users[0].suspended_until});
+                    }else{
+                        connection.query("UPDATE users SET status='ACTIVE', suspended_until=NULL WHERE id=?", [users[0].id]);
+                        users[0].status = "ACTIVE";
+                        users[0].suspended_until = null;
                     }
                 }
 
@@ -161,22 +160,42 @@ app.post('/getFilms', optionalAuthMiddleware, (req, res) => {
 
     const userId = req.user?.id || null;
     let language = req.body.language || "en";
+    const page = Number(req.body.page) || 1;
+    const limit = 20;
+    const offset = (page - 1) * limit;
+    const search = req.body.search || "";
+
+    let searchQuery = "";
+
+    if(search){
+        searchQuery = "AND film_translations.title LIKE ?";
+    }
 
     if (!isLanguageValid(language)) {
         language = "en";
     }
 
-    connection.query(
-        "SELECT films.id, films.poster_url, films.rating, films.release_date, films.duration, film_translations.title, film_translations.description, user_favorites.film_id, user_watched.film_id AS watchedFilmId FROM films INNER JOIN film_translations ON films.id = film_translations.film_id LEFT JOIN user_favorites ON films.id = user_favorites.film_id AND user_favorites.user_id = ? LEFT JOIN user_watched ON films.id = user_watched.film_id AND user_watched.user_id = ? WHERE film_translations.language_code = ?", [userId, userId, language], (err, result) => {
 
-            if (err) {
-                return res.json({message:"Error getting films. Error: "+err});
+    connection.query(`SELECT films.id, films.poster_url, films.rating, films.release_date, films.duration,film_translations.title, film_translations.description, user_favorites.film_id, user_watched.film_id AS watchedFilmId FROM films INNER JOIN film_translations ON films.id = film_translations.film_id LEFT JOIN user_favorites ON films.id = user_favorites.film_id AND user_favorites.user_id = ? LEFT JOIN user_watched ON films.id = user_watched.film_id AND user_watched.user_id = ? WHERE film_translations.language_code = ? ${searchQuery} ORDER BY films.id DESC LIMIT ? OFFSET ?`, search ? [userId, userId, language, `%${search}%`, limit, offset] : [userId, userId, language, limit, offset], (err,result)=>{
+
+            if(err){
+                console.log(err);
+                return res.json({message:"Error getting films"});
             }
 
-            return res.json({message:"Films got successfully", body:result});
+            connection.query(`SELECT COUNT(*) AS count FROM films INNER JOIN film_translations ON films.id = film_translations.film_id WHERE film_translations.language_code = ? ${searchQuery}`,  search  ? [language, `%${search}%`]  : [language],  (err,count)=>{
+
+                    if(err){
+                        console.log(err);
+                        return res.json({message:"Error counting films"});
+                    }
+
+                    return res.json({message:"Films got successfully", body:result, totalPages:Math.ceil(count[0].count / limit)});
+
+                }
+            );
         }
     );
-
 });
 
 app.post("/likeToggle",authMiddleware, (req, res) => {
@@ -244,30 +263,65 @@ app.post("/watchedToggle",authMiddleware, (req, res) => {
         }
     })
 })
-app.post("/likedGet",authMiddleware, (req, res) => {
-    const userId = req.user.id
+app.post("/likedGet", authMiddleware, (req, res) => {
 
-    connection.query("SELECT films.id, films.poster_url, films.rating, films.release_date, films.duration, film_translations.title, film_translations.description, user_watched.film_id AS watchedFilmId FROM user_favorites INNER JOIN films ON user_favorites.film_id = films.id INNER JOIN film_translations ON films.id = film_translations.film_id LEFT JOIN user_watched ON films.id = user_watched.film_id AND user_watched.user_id = user_favorites.user_id WHERE user_favorites.user_id = ? AND film_translations.language_code = (SELECT language_code FROM users WHERE id = ?) ORDER BY user_favorites.created_at DESC",[userId,userId],(err, result) => {
-        if (err) {
-            return res.json({message: "Error while getting favorites. Error: "+err});
-        }
-        if (result){
-            return res.json({message: "Liked got successfully" ,body:result});
-        }
-    })
-})
+    const userId = req.user.id;
+    const page = Number(req.body.page) || 1;
+    const limit = 20;
+    const offset = (page - 1) * limit;
+    const search = req.body.search || "";
+    let searchQuery = "";
+
+    if(search){
+        searchQuery = "AND film_translations.title LIKE ?";
+    }
+
+    connection.query(`SELECT films.id, films.poster_url, films.rating, films.release_date, films.duration,film_translations.title, film_translations.description, user_favorites.film_id, user_watched.film_id AS watchedFilmId FROM user_favorites INNER JOIN films  ON user_favorites.film_id = films.id INNER JOIN film_translations ON films.id = film_translations.film_id LEFT JOIN user_watched ON films.id = user_watched.film_id AND user_watched.user_id = user_favorites.user_id WHERE user_favorites.user_id = ? AND film_translations.language_code = ( SELECT language_code FROM users  WHERE id = ?) ${searchQuery} ORDER BY user_favorites.created_at DESC LIMIT ? OFFSET ?`, search ? [userId, userId, `%${search}%`, limit, offset] : [userId, userId, limit, offset], (err,result)=>{
+
+            if(err){
+                console.log(err);
+                return res.json({message:"Error while getting favorites",success:false});
+            }
+
+            connection.query(`SELECT COUNT(*) AS count FROM user_favorites INNER JOIN films ON user_favorites.film_id = films.id INNER JOIN film_translations ON films.id = film_translations.film_id WHERE user_favorites.user_id = ? AND film_translations.language_code = ( SELECT language_code  FROM users  WHERE id = ?) ${searchQuery}`, search  ?  [userId, userId, `%${search}%`]  :  [userId, userId], (err,count)=>{
+
+                    if(err){
+                        console.log(err);
+                        return res.json({message:"Error counting favorites", success:false});
+                    }
+                    return res.json({message:"Liked got successfully", body:result, totalPages:Math.ceil(count[0].count / limit), success:true});
+                });
+        });
+});
 
 app.post("/watchedGet",authMiddleware, (req, res) => {
     const userId = req.user.id;
+    const page = Number(req.body.page) || 1;
+    const limit = 20;
+    const offset = (page - 1) * limit;
+    const search = req.body.search || "";
+    let searchQuery = "";
 
-    connection.query("SELECT films.id, films.poster_url, films.rating, films.release_date, films.duration, film_translations.title, film_translations.description, user_favorites.film_id AS userFavoritesFilms FROM user_watched INNER JOIN films ON user_watched.film_id = films.id INNER JOIN film_translations ON films.id = film_translations.film_id LEFT JOIN user_favorites ON films.id = user_favorites.film_id AND user_favorites.user_id = user_watched.user_id WHERE user_watched.user_id = ? AND film_translations.language_code = (SELECT language_code FROM users WHERE id = ? ) ORDER BY user_watched.watched_at DESC",[userId,userId],(err, result) => {
-        if (err) {
-            return res.json({message: "Error while getting watched. Error: "+err});
+    if(search){
+        searchQuery = "AND film_translations.title LIKE ?";
+    }
+
+    connection.query(`SELECT films.id, films.poster_url, films.rating, films.release_date, films.duration,film_translations.title, film_translations.description, user_favorites.film_id, user_watched.film_id AS watchedFilmId FROM user_favorites INNER JOIN films  ON user_favorites.film_id = films.id INNER JOIN film_translations ON films.id = film_translations.film_id LEFT JOIN user_watched ON films.id = user_watched.film_id AND user_watched.user_id = user_favorites.user_id WHERE user_watched.user_id = ? AND film_translations.language_code = ( SELECT language_code FROM users  WHERE id = ?) ${searchQuery} ORDER BY user_favorites.created_at DESC LIMIT ? OFFSET ?`, search ? [userId, userId, `%${search}%`, limit, offset] : [userId, userId, limit, offset], (err,result)=>{
+
+        if(err){
+            console.log(err);
+            return res.json({message:"Error while getting watched", success:false});
         }
-        if (result){
-            return res.json({message: "Watched got successfully" ,body:result});
-        }
-    })
+
+        connection.query(`SELECT COUNT(*) AS count FROM user_watched INNER JOIN films ON user_watched.film_id = films.id INNER JOIN film_translations ON films.id = film_translations.film_id WHERE user_watched.user_id = ? AND film_translations.language_code = ( SELECT language_code  FROM users  WHERE id = ?) ${searchQuery}`, search  ?  [userId, userId, `%${search}%`]  :  [userId, userId], (err,count)=>{
+
+            if(err){
+                console.log(err);
+                return res.json({message:"Error counting watched", success:false});
+            }
+            return res.json({message:"Watched got successfully", body:result, totalPages:Math.ceil(count[0].count / limit), success:true});
+        });
+    });
 })
 
 app.post("/getUserData", authMiddleware, (req, res) => {
@@ -448,7 +502,7 @@ app.get("/getFilm/:id", optionalAuthMiddleware, (req, res) => {
         return res.json({ message: "Error id is missing" });
     }
 
-    connection.query("SELECT films.id, films.poster_url, films.rating, films.release_date, films.duration, film_translations.title, film_translations.description, GROUP_CONCAT(DISTINCT genres.name ORDER BY genres.name SEPARATOR ', ') AS genres, uf.film_id AS favoriteFilmId, uw.film_id AS watchedFilmId FROM films INNER JOIN film_translations ON films.id = film_translations.film_id INNER JOIN film_genres ON films.id = film_genres.film_id INNER JOIN genres ON genres.id = film_genres.genre_id LEFT JOIN user_favorites uf ON uf.film_id = films.id AND uf.user_id = ? LEFT JOIN user_watched uw ON uw.film_id = films.id AND uw.user_id = ? WHERE films.id = ? AND film_translations.language_code = ? GROUP BY films.id, films.poster_url, films.rating, films.release_date, films.duration, film_translations.title, film_translations.description, uf.film_id, uw.film_id;", [userId,userId,filmId,languageCode], (err, result) => {
+    connection.query("SELECT films.id, films.poster_url, films.rating, films.release_date, films.duration, film_translations.title, film_translations.description, GROUP_CONCAT(DISTINCT genres.name ORDER BY genres.name SEPARATOR ', ') AS genres, uf.film_id AS favoriteFilmId, uw.film_id AS watchedFilmId FROM films INNER JOIN film_translations ON films.id = film_translations.film_id LEFT JOIN film_genres ON films.id = film_genres.film_id LEFT JOIN genres ON genres.id = film_genres.genre_id LEFT JOIN user_favorites uf ON uf.film_id = films.id AND uf.user_id = ? LEFT JOIN user_watched uw ON uw.film_id = films.id AND uw.user_id = ? WHERE films.id = ? AND film_translations.language_code = ? GROUP BY films.id, films.poster_url, films.rating, films.release_date, films.duration, film_translations.title, film_translations.description, uf.film_id, uw.film_id;", [userId,userId,filmId,languageCode], (err, result) => {
             if (err) {
                 return res.json({ message: "Error while getting film" });
             }
@@ -585,21 +639,17 @@ app.get("/getUsers", authMiddleware, adminMiddleware, (req, res) => {
     const offset = (page - 1) * limit;
 
 
-    connection.query(
-        "SELECT id, username, avatar_url, email, created_at, role, status, language_code FROM users LIMIT ? OFFSET ?", [limit, offset], (err, result) => {
+    connection.query(`SELECT id, username, avatar_url, email, created_at, role, status, language_code, languages.name AS "language" FROM users LEFT JOIN languages ON languages.code = users.language_code LIMIT ? OFFSET ?`, [limit, offset], (err, result) => {
 
             if(err){
-                return res.json({success:false, message:"Database error"});
+                return res.json({success:false, message:"database_error"});
             }
 
 
             connection.query("SELECT COUNT(id) AS count FROM users", (err, countResult)=>{
 
                     if(err){
-                        return res.json({
-                            success:false,
-                            message:"Database error"
-                        });
+                        return res.json({success:false, message:"database_error"});
                     }
 
                     const totalPages = Math.ceil(countResult[0].count / limit);
@@ -617,7 +667,7 @@ app.get("/getUsers", authMiddleware, adminMiddleware, (req, res) => {
 app.get("/getUsersCount", authMiddleware, adminMiddleware, (req,res) => {
     connection.query("SELECT COUNT(id) AS users_count FROM users", (err,result) => {
             if(err){
-                return res.status(500).json({message:"Database error", success:false});
+                return res.status(500).json({message:"database_error", success:false});
             }
 
             return res.json({users_count: result[0].users_count,success:true});
@@ -628,20 +678,17 @@ app.get("/getUsersCount", authMiddleware, adminMiddleware, (req,res) => {
 app.get("/refreshUser/:userId", authMiddleware, adminMiddleware, (req, res) => {
     const userId = req.params.userId;
     if (!userId) {
-        return res.json({message:"No user found", success: false});
+        return res.json({message:"no_user_found", success: false});
     }
     connection.query("SELECT `id`, `username`, `avatar_url`, `email`, `created_at`, `role`, `status`,`language_code`, languages.name AS \"language\" FROM `users` LEFT JOIN languages ON users.language_code = languages.code WHERE users.id = ?",[userId],(err, result) => {
         if (err){
-            return res.status(500).json({message:"Database error",success:false});
+            return res.status(500).json({message:"database_error",success:false});
         }
-        if(result.affectedRows === 0){
-            return res.json({
-                success:false,
-                message:"User not found"
-            });
+        if(result.length === 0){
+            return res.json({success:false, message:"user_not_found"});
         }
 
-        return res.json({message: "User fetched successfully", user: result[0], success: true});
+        return res.json({message: "user_fetched_successfully", user: result[0], success: true});
 
     })
 })
@@ -651,33 +698,46 @@ app.post("/banUser", authMiddleware, adminMiddleware, (req,res) => {
 
     const banBy = req.user.id;
 
-
     if (!userId) {
-        return res.json({message:"No user found", success: false});
+        return res.json({message:"no_user_found", success: false});
     }
 
     if (!banReason) {
-        return res.json({message:"Enter ban reason", success: false});
+        return res.json({message:"enter_ban_reason", success: false});
     }
 
     if(userStatus === "BANNED"){
-        return res.json({message:"User is already banned", success: false});
+        return res.json({message:"user_is_already_banned", success: false});
     }
 
-    connection.query(`UPDATE users SET status = "BANNED", suspended_until = NULL,suspend_reason = NULL, suspended_at = NULL,suspended_by = NULL, ban_reason = ?, banned_at = NOW(), banned_by = ? WHERE id = ?`,[banReason,banBy,userId],(err, result) => {
-        if (err){
-            return res.status(500).json({message:"Database error",success:false});
-        }
-        if(result.affectedRows === 0){
-            return res.json({
-                success:false,
-                message:"User not found"
-            });
+    checkIfUserIsAdmin(connection, userId, (err, isAdmin, notFound)=> {
+
+        if (err) {
+            return res.status(500).json({success: false, message: "database_error"});
         }
 
-        return res.json({message: "User banned successfully", success: true});
+        if (notFound) {
+            return res.json({success: false, message: "user_not_found"});
+        }
 
+        if (isAdmin) {
+            return res.json({success: false, message: "you_cannot_ban_another_admin"});
+        }
+
+        connection.query(`UPDATE users SET status = "BANNED", suspended_until = NULL,suspend_reason = NULL, suspended_at = NULL,suspended_by = NULL, ban_reason = ?, banned_at = NOW(), banned_by = ? WHERE id = ?`,[banReason,banBy,userId],(err, result) => {
+            if (err){
+                return res.status(500).json({message:"database_error",success:false});
+            }
+            if(result.affectedRows === 0){
+                return res.json({success:false, message:"user_not_found"});
+            }
+
+            return res.json({message: "user_banned_successfully", success: true});
+
+        })
     })
+
+
 })
 
 app.post("/suspendUser", authMiddleware, adminMiddleware, (req,res) => {
@@ -685,42 +745,52 @@ app.post("/suspendUser", authMiddleware, adminMiddleware, (req,res) => {
 
     const suspendBy = req.user.id;
 
+
     if (!suspendReason) {
-        return res.json({message:"Enter suspend reason", success: false});
+        return res.json({message:"enter_suspend_reason", success: false});
     }
 
     if (!suspendUntil) {
-        return res.json({message:"Enter date until user will be banned", success: false});
+        return res.json({message:"enter_date_until_user_will_be_suspended", success: false});
     }
 
     if (!userId) {
-        return res.json({message:"No user found", success: false});
+        return res.json({message:"no_user_found", success: false});
     }
 
     if(userStatus === "SUSPENDED"){
-        return res.json({message:"User is already suspended", success: false});
+        return res.json({message:"user_is_already_suspended", success: false});
     }
 
     if (new Date(suspendUntil) <= new Date()) {
-        return res.json({
-            success: false,
-            message: "Suspend date must be in the future"
-        });
+        return res.json({success: false, message: "suspend_date_must_be_in_the_future"});
     }
 
-    connection.query(`UPDATE users SET status = "SUSPENDED", suspended_until = ? ,suspend_reason = ?, suspended_at = NOW(),suspended_by = ?, ban_reason = NULL, banned_at = NULL, banned_by = NULL WHERE id = ?`,[suspendUntil, suspendReason, suspendBy, userId],(err,result) => {
-        if (err){
-            return res.status(500).json({message:"Database error",success:false});
-        }
-        if(result.affectedRows === 0){
-            return res.json({
-                success:false,
-                message:"User not found"
-            });
+    checkIfUserIsAdmin(connection, userId, (err, isAdmin, notFound)=> {
+
+        if (err) {
+            return res.status(500).json({success: false, message: "database_error"});
         }
 
-        return res.json({message: "User suspended successfully", success: true});
+        if (notFound) {
+            return res.json({success: false, message: "user_not_found"});
+        }
 
+        if (isAdmin) {
+            return res.json({success: false, message: "you_cannot_suspend_another_admin"});
+        }
+
+        connection.query(`UPDATE users SET status = "SUSPENDED", suspended_until = ? ,suspend_reason = ?, suspended_at = NOW(),suspended_by = ?, ban_reason = NULL, banned_at = NULL, banned_by = NULL WHERE id = ?`,[suspendUntil, suspendReason, suspendBy, userId],(err,result) => {
+            if (err){
+                return res.status(500).json({message:"database_error",success:false});
+            }
+            if(result.affectedRows === 0){
+                return res.json({success:false, message:"user_not_found"});
+            }
+
+            return res.json({message: "user_suspended_successfully", success: true});
+
+        })
     })
 })
 
@@ -728,25 +798,22 @@ app.post("/unBanUser", authMiddleware, adminMiddleware, (req,res) => {
     const {userId,userStatus} = req.body;
 
     if (!userId) {
-        return res.json({message:"No user found", success: false});
+        return res.json({message:"no_user_found", success: false});
     }
 
     if(userStatus !== "BANNED"){
-        return res.json({message:"User is not banned", success: false});
+        return res.json({message:"user_is_not_banned", success: false});
     }
 
     connection.query(`UPDATE users SET status = "ACTIVE", ban_reason = NULL, banned_at = NULL, banned_by = NULL WHERE id = ?`,[userId],(err,result) => {
         if (err){
-            return res.status(500).json({message:"Database error",success:false});
+            return res.status(500).json({message:"database_error",success:false});
         }
         if(result.affectedRows === 0){
-            return res.json({
-                success:false,
-                message:"User not found"
-            });
+            return res.json({success:false, message:"user_not_found"});
         }
 
-        return res.json({message: "User unbanned successfully", success: true});
+        return res.json({message: "user_unbanned_successfully", success: true});
 
     })
 })
@@ -755,28 +822,80 @@ app.post("/unSuspendUser", authMiddleware, adminMiddleware, (req,res) => {
     const {userId,userStatus} = req.body;
 
     if (!userId) {
-        return res.json({message:"No user found", success: false});
+        return res.json({message:"no_user_found", success: false});
     }
 
     if(userStatus !== "SUSPENDED"){
-        return res.json({message:"User is not suspended", success: false});
+        return res.json({message:"user_is_not_suspended", success: false});
     }
 
     connection.query(`UPDATE users SET status = "ACTIVE", suspended_until = NULL, suspend_reason = NULL, suspended_at = NULL, suspended_by = NULL WHERE id = ?`,[userId],(err, result) => {
         if (err){
-            return res.status(500).json({message:"Database error",success:false});
+            return res.status(500).json({message:"database_error",success:false});
         }
         if(result.affectedRows === 0){
-            return res.json({
-                success:false,
-                message:"User not found"
-            });
+            return res.json({success:false, message:"user_not_found"});
         }
 
-        return res.json({message: "User unsuspended successfully", success: true});
+        return res.json({message: "user_unsuspended_successfully", success: true});
 
     })
 })
+
+app.post("/promoteUser", authMiddleware, adminMiddleware, (req,res)=>{
+
+    const {userId,password} = req.body;
+
+    if (!userId) {
+        return res.json({message:"no_user_found", success: false});
+    }
+
+    if (!password) {
+        return res.json({message:"no_password_found", success: false});
+    }
+
+    const adminId = req.user.id;
+
+    connection.query("SELECT password FROM users WHERE id=?", [adminId], (err,result)=>{
+
+            if(err){
+                return res.status(500).json({success:false,message:"database_error"});
+            }
+
+            bcrypt.compare(password,result[0].password,(err,match)=>{
+
+                if(!match){
+                    return res.json({success:false, message:"invalid_password"});
+                }
+
+                connection.query("UPDATE users SET role=1 WHERE id=?", [userId], (err,result)=>{
+
+                        if(err){
+                            return res.status(500).json({success:false, message:"database_error"});
+                        }
+                        if(result.affectedRows === 0){
+                            return res.json({success:false, message:"user_not_found"});
+                        }
+
+                        return res.json({success:true, message:"user_promoted_to_admin"});
+
+                    }
+                );
+            });
+        }
+    );
+});
+
+app.post("/checkSuspensions", authMiddleware, adminMiddleware, (req,res)=>{
+    connection.query(`UPDATE users SET status='ACTIVE', suspended_until=NULL WHERE status='SUSPENDED' AND suspended_until <= NOW()`, (err,result)=>{
+            if(err){
+                console.log(err);
+                return res.json({message:"error_checking_suspensions",success:false});
+            }
+            return res.json({message:"suspensions_checked_successfully", updated:result.affectedRows, success:true});
+        }
+    );
+});
 
 
 app.listen(process.env.PORT, () => {
