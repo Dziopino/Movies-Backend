@@ -107,26 +107,22 @@ app.post('/addUser', async (req, res) => {
     const {username, email, password} = req.body;
 
     if (!username || !email || !password) {
-        return res.json({message: "Invalid input data",success:false});
+        return res.json({message: "invalid_input_data",success:false});
     }
 
     if (!isPasswordValid(password)) {
-        return res.status(400).json({
-            message:"Password does not meet requirements",
-            success:false
-        });
+        return res.status(400).json({message:"password_requirements_not_met", success:false});
     }
 
     try {
 
         const hash = await hashPassword(password);
 
-        connection.query(
-            "INSERT INTO `users`(`password`, `username`, `email`) VALUES (?,?,?)", [hash, username, email], (err, result) => {
+        connection.query("INSERT INTO `users`(`password`, `username`, `email`,) VALUES (?,?,?)", [hash, username, email], (err, result) => {
 
                 if (err) {
                     if (err.code === "ER_DUP_ENTRY") {
-                        return res.json({message:"Email already exists",success:false});
+                        return res.json({message:"email_already_exists",success:false});
                     }
 
                     return res.json({message:"Error while registering",success:false});
@@ -137,22 +133,20 @@ app.post('/addUser', async (req, res) => {
                 connection.query("SELECT users.id, users.password, users.username, users.avatar_url, users.email, users.created_at, users.role, users.bio, users.language_code FROM users WHERE users.id = ?", [insertedId], (err, user) => {
 
                     if (err) {
-                        return res.json({message: "Error while registering. Error: " + err,success:false});
+                        return res.json({message: "error_while_registering"});
                     }
 
                     const token = generateToken(user[0]);
 
                     delete user[0].password;
 
-                    res.json({message:"Registered successfully", token, user:user[0],success:true});
+                    res.json({message:"registered_successfully", token, user:user[0],success:true});
                 });
             }
         );
 
     } catch (err) {
-        return res.json({
-            message: "Password hashing error"
-        });
+        return res.json({message: "password_hashing_error"});
     }
 })
 
@@ -637,40 +631,33 @@ app.get("/getUsers", authMiddleware, adminMiddleware, (req, res) => {
     const page = Number(req.query.page) || 1;
     const limit = 25;
     const offset = (page - 1) * limit;
+    const search = req.query.search || "";
+
+    let searchQuery = "";
+
+    if (search) {
+        searchQuery = "WHERE users.id LIKE ? OR users.username LIKE ? OR users.email LIKE ?";
+    }
 
 
-    connection.query(`SELECT id, username, avatar_url, email, created_at, role, status, language_code, languages.name AS "language" FROM users LEFT JOIN languages ON languages.code = users.language_code LIMIT ? OFFSET ?`, [limit, offset], (err, result) => {
+    connection.query(`SELECT id, username, avatar_url, email, created_at, role, status, language_code, languages.name AS language FROM users LEFT JOIN languages ON languages.code = users.language_code ${searchQuery} ORDER BY users.id DESC LIMIT ? OFFSET ?`, search ? [search,`%${search}%`, `%${search}%`, limit, offset] : [limit, offset], (err, result) => {
 
             if(err){
                 return res.json({success:false, message:"database_error"});
             }
 
 
-            connection.query("SELECT COUNT(id) AS count FROM users", (err, countResult)=>{
+        connection.query(`SELECT COUNT(id) AS count FROM users ${searchQuery}`, search ? [search,`%${search}%`, `%${search}%`] : [], (err, countResult) => {
 
                     if(err){
                         return res.json({success:false, message:"database_error"});
                     }
+                    const users_count = countResult[0].count;
+                    const totalPages = Math.ceil(users_count / limit);
 
-                    const totalPages = Math.ceil(countResult[0].count / limit);
-
-
-                    return res.json({success:true, users:result, totalPages});
-
+                    return res.json({success:true, users:result, totalPages, users_count});
                 }
             );
-        }
-    );
-
-});
-
-app.get("/getUsersCount", authMiddleware, adminMiddleware, (req,res) => {
-    connection.query("SELECT COUNT(id) AS users_count FROM users", (err,result) => {
-            if(err){
-                return res.status(500).json({message:"database_error", success:false});
-            }
-
-            return res.json({users_count: result[0].users_count,success:true});
         }
     );
 });
@@ -736,8 +723,6 @@ app.post("/banUser", authMiddleware, adminMiddleware, (req,res) => {
 
         })
     })
-
-
 })
 
 app.post("/suspendUser", authMiddleware, adminMiddleware, (req,res) => {
@@ -896,6 +881,271 @@ app.post("/checkSuspensions", authMiddleware, adminMiddleware, (req,res)=>{
         }
     );
 });
+
+app.get("/getGenres", authMiddleware, adminMiddleware, (req, res) => {
+
+    const page = Number(req.query.page) || 1;
+    const limit = 20;
+    const offset = (page - 1) * limit;
+    const search = req.query.search || "";
+
+    let searchQuery = "";
+
+    if (search) {
+        searchQuery = "WHERE genres.id LIKE ? OR genres.name LIKE ?";
+    }
+
+
+    connection.query(`SELECT genres.id, genres.name, COUNT(film_genres.film_id) AS movies_count FROM genres LEFT JOIN film_genres ON genres.id = film_genres.genre_id ${searchQuery} GROUP BY genres.id, genres.name ORDER BY genres.id DESC LIMIT ? OFFSET ?`, search ? [search, `%${search}%`, limit, offset] : [limit, offset], (err, result) => {
+
+            if(err){
+                return res.json({success:false, message:"database_error"});
+            }
+
+
+            connection.query(`SELECT COUNT(id) AS count FROM genres ${searchQuery}`, search ? [search,`%${search}%`] : [], (err, countResult) => {
+
+                    if(err){
+                        return res.json({success:false, message:"database_error"});
+                    }
+                    const genres_count = countResult[0].count;
+                    const totalPages = Math.ceil(genres_count / limit);
+
+                    return res.json({success:true, genres:result, totalPages, genres_count});
+                }
+            );
+        }
+    );
+});
+
+app.get("/refreshGenre/:genreId", authMiddleware, adminMiddleware, (req, res) => {
+    const genreId = req.params.genreId;
+    if (!genreId) {
+        return res.json({message:"no_genre_found", success: false});
+    }
+    connection.query("SELECT genres.id, genres.name, COUNT(film_genres.film_id) AS movies_count FROM genres LEFT JOIN film_genres ON genres.id = film_genres.genre_id WHERE genres.id = ? GROUP BY genres.id, genres.name ORDER BY genres.id",[genreId],(err, result) => {
+        if (err){
+            return res.status(500).json({message:"database_error",success:false});
+        }
+        if(result.length === 0){
+            return res.json({success:false, message:"genre_not_found"});
+        }
+
+        return res.json({message: "genre_fetched_successfully", genre: result[0], success: true});
+
+    })
+})
+
+app.post("/deleteGenre", authMiddleware, adminMiddleware, (req,res)=>{
+
+    const {genreId,password} = req.body;
+
+    if (!genreId) {
+        return res.json({message:"no_genre_found", success: false});
+    }
+
+    if (!password) {
+        return res.json({message:"no_password_found", success: false});
+    }
+
+    const adminId = req.user.id;
+
+    connection.query("SELECT password FROM users WHERE id=?", [adminId], (err,result)=>{
+
+            if(err){
+                return res.status(500).json({success:false,message:"database_error"});
+            }
+
+            bcrypt.compare(password,result[0].password,(err,match)=>{
+
+                if(!match){
+                    return res.json({success:false, message:"invalid_password"});
+                }
+
+                connection.query("DELETE FROM genres WHERE id = ?;", [genreId], (err,result)=>{
+
+                        if(err){
+                            return res.status(500).json({success:false, message:"database_error"});
+                        }
+                        if(result.affectedRows === 0){
+                            return res.json({success:false, message:"genre_not_found"});
+                        }
+
+                        return res.json({success:true, message:"genre_deleted_successfully"});
+                    }
+                );
+            });
+        }
+    );
+});
+
+app.post("/editGenre", authMiddleware, adminMiddleware, (req,res) => {
+    const genreId = req.body.genreId;
+    let newGenreName = req.body.newGenreName;
+
+    newGenreName = newGenreName.trim().toLowerCase();
+
+    if (!genreId) {
+        return res.json({message:"no_genre_found", success: false});
+    }
+
+    if(!newGenreName){
+        return res.json({message:"no_new_genre_name_found", success: false});
+    }
+
+    connection.query(`UPDATE genres SET genres.name = ? WHERE id = ?`,[newGenreName, genreId],(err, result) => {
+        if (err) {
+            if (err.code === "ER_DUP_ENTRY") {
+                return res.json({success: false, message: "genre_already_exists"});
+            }
+
+            return res.status(500).json({success: false, message: "database_error"});
+        }
+        if(result.affectedRows === 0){
+            return res.json({success:false, message:"genre_not_found"});
+        }
+
+        return res.json({message: "genre_edited_successfully", success: true});
+
+    })
+})
+
+app.post("/addGenre", authMiddleware, adminMiddleware, (req,res) => {
+    let newGenreName = req.body.newGenreName;
+
+    newGenreName = newGenreName.trim().toLowerCase();
+
+    if(!newGenreName){
+        return res.json({message:"no_new_genre_name_found", success: false});
+    }
+
+    connection.query(`INSERT INTO genres (genres.name) VALUES (?)`,[newGenreName],(err, result) => {
+        if (err) {
+            if (err.code === "ER_DUP_ENTRY") {
+                return res.json({success: false, message: "genre_already_exists"});
+            }
+
+            return res.status(500).json({success: false, message: "database_error"});
+        }
+
+        return res.json({message: "genre_added_successfully", success: true});
+
+    })
+})
+
+app.get("/getFilmsAdmin", authMiddleware, adminMiddleware, (req, res) => {
+
+    const page = Number(req.query.page) || 1;
+    const limit = 20;
+    const offset = (page - 1) * limit;
+    const search = req.query.search || "";
+    const language = req.query.language || "en";
+    let searchQuery = "";
+
+    if(search){
+        searchQuery = "WHERE films.id LIKE ? OR film_translations.title LIKE ?";
+    }
+
+
+    connection.query(`SELECT films.id, films.poster_url, films.rating, films.release_date, films.duration, film_translations.title, COUNT(film_genres.genre_id) AS genres_count FROM films JOIN film_translations ON film_translations.film_id = films.id AND film_translations.language_code = ? LEFT JOIN film_genres ON film_genres.film_id = films.id  ${searchQuery} GROUP BY films.id, films.poster_url, films.rating, films.release_date, films.duration, film_translations.title ORDER BY films.id DESC LIMIT ? OFFSET ?`, search ? [language, search, `%${search}%`, limit, offset] : [language, limit, offset], (err,result)=>{
+
+            if(err){
+                return res.json({success:false, message:"database_error"});
+            }
+
+
+            connection.query(`SELECT COUNT(DISTINCT films.id) AS count FROM films JOIN film_translations ON film_translations.film_id = films.id AND film_translations.language_code = ?${searchQuery}`,  search ? [language, search, `%${search}%`] : [language], (err,countResult)=>{
+
+                    if(err){
+                        return res.json({success:false, message:"database_error"});
+                    }
+
+                    const films_count = countResult[0].count;
+                    const totalPages = Math.ceil(films_count / limit);
+
+                    return res.json({success:true, films:result, totalPages, films_count});
+
+                });
+        });
+});
+
+app.post("/deleteFilm", authMiddleware, adminMiddleware, (req,res)=>{
+
+    const {filmId,password} = req.body;
+
+    if (!filmId) {
+        return res.json({message:"no_film_found", success: false});
+    }
+
+    if (!password) {
+        return res.json({message:"no_password_found", success: false});
+    }
+
+    const adminId = req.user.id;
+
+    connection.query("SELECT password FROM users WHERE id=?", [adminId], (err,result)=>{
+
+            if(err){
+                return res.status(500).json({success:false,message:"database_error"});
+            }
+
+            bcrypt.compare(password,result[0].password,(err,match)=>{
+
+                if(!match){
+                    return res.json({success:false, message:"invalid_password"});
+                }
+
+                connection.query("DELETE FROM films WHERE id = ?;", [filmId], (err,result)=>{
+
+                        if(err){
+                            return res.status(500).json({success:false, message:"database_error"});
+                        }
+                        if(result.affectedRows === 0){
+                            return res.json({success:false, message:"film_not_found"});
+                        }
+
+                        return res.json({success:true, message:"film_deleted_successfully"});
+                    }
+                );
+            });
+        }
+    );
+});
+
+app.post('/addAdmin',authMiddleware, adminMiddleware, async (req, res) => {
+    const {username, email, password} = req.body;
+
+    if (!username || !email || !password) {
+        return res.json({message: "invalid_input_data",success:false});
+    }
+
+    if (!isPasswordValid(password)) {
+        return res.status(400).json({message:"password_requirements_not_met", success:false});
+    }
+
+    try {
+
+        const hash = await hashPassword(password);
+
+        connection.query("INSERT INTO `users`(`password`, `username`, `email`, `role`) VALUES (?,?,?,1)", [hash, username, email], (err) => {
+
+                if (err) {
+                    if (err.code === "ER_DUP_ENTRY") {
+                        return res.json({message:"email_already_exists",success:false});
+                    }
+
+                    return res.json({message:"error_while_registering",success:false});
+                }
+
+                return res.json({message:"admin_created_successfully",success:true})
+            }
+        );
+
+    } catch (err) {
+        return res.json({message: "password_hashing_error",success:false});
+    }
+})
+
 
 
 app.listen(process.env.PORT, () => {
