@@ -374,6 +374,12 @@ npm start
 
 The API will listen on the port defined in `process.env.PORT` (default: `3000`).
 
+## 🛢 Database setup 
+1. Create a MySQL database.
+2. Import database/cinemix.sql.
+3. Configure database credentials in .env. 
+4. Start the backend with npm run dev.
+
 ---
 
 ## 🔐 Environment Variables
