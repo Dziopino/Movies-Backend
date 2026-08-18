@@ -107,22 +107,22 @@ app.post('/addUser', async (req, res) => {
     const {username, email, password} = req.body;
 
     if (!username || !email || !password) {
-        return res.json({message: "invalid_input_data",success:false});
+        return res.json({message: "Invalid input data",success:false});
     }
 
     if (!isPasswordValid(password)) {
-        return res.status(400).json({message:"password_requirements_not_met", success:false});
+        return res.status(400).json({message:"Password requirements not met", success:false});
     }
 
     try {
 
         const hash = await hashPassword(password);
 
-        connection.query("INSERT INTO `users`(`password`, `username`, `email`,) VALUES (?,?,?)", [hash, username, email], (err, result) => {
+        connection.query("INSERT INTO `users`(`password`, `username`, `email`) VALUES (?,?,?)", [hash, username, email], (err, result) => {
 
                 if (err) {
                     if (err.code === "ER_DUP_ENTRY") {
-                        return res.json({message:"email_already_exists",success:false});
+                        return res.json({message:"Email already exists",success:false});
                     }
 
                     return res.json({message:"Error while registering",success:false});
@@ -133,20 +133,20 @@ app.post('/addUser', async (req, res) => {
                 connection.query("SELECT users.id, users.password, users.username, users.avatar_url, users.email, users.created_at, users.role, users.bio, users.language_code FROM users WHERE users.id = ?", [insertedId], (err, user) => {
 
                     if (err) {
-                        return res.json({message: "error_while_registering"});
+                        return res.json({message: "Error while registering"});
                     }
 
                     const token = generateToken(user[0]);
 
                     delete user[0].password;
 
-                    res.json({message:"registered_successfully", token, user:user[0],success:true});
+                    res.json({message:"Registered successfully", token, user:user[0],success:true});
                 });
             }
         );
 
     } catch (err) {
-        return res.json({message: "password_hashing_error"});
+        return res.json({message: "Password hashing error"});
     }
 })
 
@@ -1148,7 +1148,11 @@ app.post('/addAdmin',authMiddleware, adminMiddleware, async (req, res) => {
 
 
 
-app.listen(process.env.PORT, () => {
-    console.log(`Server started on port ${process.env.PORT}`);
-})
+if (require.main === module) {
+    app.listen(process.env.PORT, () => {
+        console.log(`Server started on port ${process.env.PORT}`);
+    });
+}
+
+module.exports = app;
 
