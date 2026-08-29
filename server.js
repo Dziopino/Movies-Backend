@@ -1047,14 +1047,14 @@ app.get("/getFilmsAdmin", authMiddleware, adminMiddleware, (req, res) => {
     }
 
 
-    connection.query(`SELECT films.id, films.poster_url, films.rating, films.release_date, films.duration, film_translations.title, COUNT(film_genres.genre_id) AS genres_count FROM films JOIN film_translations ON film_translations.film_id = films.id AND film_translations.language_code = ? LEFT JOIN film_genres ON film_genres.film_id = films.id  ${searchQuery} GROUP BY films.id, films.poster_url, films.rating, films.release_date, films.duration, film_translations.title ORDER BY films.id DESC LIMIT ? OFFSET ?`, search ? [language, search, `%${search}%`, limit, offset] : [language, limit, offset], (err,result)=>{
+    connection.query(`SELECT films.id, films.poster_url, films.rating, films.release_date, films.duration, film_translations.title, COUNT(film_genres.genre_id) AS genres_count FROM films LEFT JOIN film_translations ON film_translations.film_id = films.id AND film_translations.language_code = ? LEFT JOIN film_genres ON film_genres.film_id = films.id  ${searchQuery} GROUP BY films.id, films.poster_url, films.rating, films.release_date, films.duration, film_translations.title ORDER BY films.id DESC LIMIT ? OFFSET ?`, search ? [language, search, `%${search}%`, limit, offset] : [language, limit, offset], (err,result)=>{
 
             if(err){
                 return res.json({success:false, message:"database_error"});
             }
 
 
-            connection.query(`SELECT COUNT(DISTINCT films.id) AS count FROM films JOIN film_translations ON film_translations.film_id = films.id AND film_translations.language_code = ?${searchQuery}`,  search ? [language, search, `%${search}%`] : [language], (err,countResult)=>{
+            connection.query(`SELECT COUNT(DISTINCT films.id) AS count FROM films LEFT JOIN film_translations ON film_translations.film_id = films.id AND film_translations.language_code = ? ${searchQuery}`,  search ? [language, search, `%${search}%`] : [language], (err,countResult)=>{
 
                     if(err){
                         return res.json({success:false, message:"database_error"});
@@ -1110,6 +1110,137 @@ app.post("/deleteFilm", authMiddleware, adminMiddleware, (req,res)=>{
             });
         }
     );
+});
+
+app.post("/addFilm", authMiddleware, adminMiddleware, upload.single('poster'), async (req, res) => {
+    const { rating, release_date, duration, translations, genres } = req.body;
+
+    if (!req.file || rating === undefined || !release_date || !duration || !translations) {
+        return res.json({ message: "missing_required_fields", success: false });
+    }
+    let parsedTranslations;
+    try {
+        parsedTranslations = typeof translations === 'string' ? JSON.parse(translations) : translations;
+    } catch (e) {
+        return res.json({ message: "invalid_translation_format", success: false });
+    }
+
+    let parsedGenres = null;
+    if (genres) {
+        try {
+            parsedGenres = typeof genres === 'string' ? JSON.parse(genres) : genres;
+        } catch (e) {
+            return res.json({ message: "invalid_genres_format", success: false });
+        }
+    }
+
+    if (!Array.isArray(parsedTranslations) || parsedTranslations.length === 0) {
+        return res.json({ message: "missing_required_fields", success: false });
+    }
+
+    const parsedRating = parseFloat(rating);
+    if (isNaN(parsedRating) || parsedRating < 0 || parsedRating > 10) {
+        return res.json({ message: "invalid_rating", success: false });
+    }
+
+    const parsedDuration = parseInt(duration);
+    if (isNaN(parsedDuration) || parsedDuration <= 0) {
+        return res.json({ message: "invalid_duration", success: false });
+    }
+
+    const hasInvalidTranslation = parsedTranslations.some(t => !t.lang_code || !t.title || !t.title.trim());
+    if (hasInvalidTranslation) {
+        return res.json({ message: "invalid_translation_data", success: false });
+    }
+
+    const languageCodes = parsedTranslations.map(t => t.lang_code);
+    const uniqueLanguageCodes = new Set(languageCodes);
+    if (languageCodes.length !== uniqueLanguageCodes.size) {
+        return res.json({ message: "duplicate_language_codes", success: false });
+    }
+
+    try {
+        const timestamp = Date.now();
+        const fileName = `poster_${timestamp}.webp`;
+        const outputPath = path.join(__dirname, '../frontend/public', fileName);
+
+        await sharp(req.file.buffer)
+            .resize(200, 285, {
+                fit: 'cover',
+                position: 'center'
+            })
+            .webp({ quality: 90 })
+            .toFile(outputPath);
+
+        const posterUrl = fileName;
+
+        connection.query("INSERT INTO films (poster_url, rating, release_date, duration) VALUES (?, ?, ?, ?)", [posterUrl, parsedRating, release_date, parsedDuration], (err, result) => {
+            if (err) {
+                console.error(err);
+                fs.unlink(outputPath).catch(unlinkErr => console.error("Error deleting file:", unlinkErr));
+                return res.status(500).json({ success: false, message: "database_error" });
+            }
+
+            const filmId = result.insertId;
+            let completedTranslations = 0;
+            let completedGenres = 0;
+            let hasError = false;
+            const totalTranslations = parsedTranslations.length;
+            const totalGenres = (parsedGenres && Array.isArray(parsedGenres)) ? parsedGenres.length : 0;
+            const totalInserts = totalTranslations + totalGenres;
+            if (totalInserts === 0) {
+                connection.query("DELETE FROM films WHERE id = ?", [filmId]);
+                fs.unlink(outputPath).catch(unlinkErr => console.error("Error deleting file:", unlinkErr));
+                return res.status(500).json({ success: false, message: "no_data_to_insert" });
+            }
+
+            parsedTranslations.forEach((translation) => {
+                connection.query("INSERT INTO film_translations (film_id, language_code, title, description) VALUES (?, ?, ?, ?)", [filmId, translation.lang_code, translation.title, translation.description || ''], (err) => {
+                        if (err && !hasError) {
+                            hasError = true;
+                            console.error(err);
+                            connection.query("DELETE FROM films WHERE id = ?", [filmId]);
+                            fs.unlink(outputPath).catch(unlinkErr => console.error("Error deleting file:", unlinkErr));
+                            return res.status(500).json({ success: false, message: "database_error" });
+                        }
+                        completedTranslations++;
+                        if (completedTranslations === totalTranslations && completedGenres === totalGenres && !hasError) {
+                            return res.json({ success: true, message: "film_added_successfully", filmId: filmId });
+                        }
+                    }
+                );
+            });
+
+            if (parsedGenres && Array.isArray(parsedGenres) && parsedGenres.length > 0) {
+                parsedGenres.forEach((genreId) => {
+                    if (genreId !== null && genreId !== undefined) {
+                        connection.query("INSERT INTO film_genres (film_id, genre_id) VALUES (?, ?)", [filmId, genreId], (err) => {
+                                if (err && !hasError) {
+                                    hasError = true;
+                                    console.error(err);
+                                    connection.query("DELETE FROM films WHERE id = ?", [filmId]);
+                                    fs.unlink(outputPath).catch(unlinkErr => console.error("Error deleting file:", unlinkErr));
+                                    return res.status(500).json({ success: false, message: "database_error" });
+                                }
+                                completedGenres++;
+                                if (completedTranslations === totalTranslations && completedGenres === totalGenres && !hasError) {
+                                    return res.json({ success: true, message: "film_added_successfully", filmId: filmId });
+                                }
+                            }
+                        );
+                    } else {
+                        completedGenres++;
+                    }
+                });
+            } else {
+                completedGenres = totalGenres;
+            }
+        }
+    );
+    } catch (error) {
+        console.error("Error processing poster:", error);
+        return res.status(500).json({ success: false, message: "error_processing_poster" });
+    }
 });
 
 app.post('/addAdmin',authMiddleware, adminMiddleware, async (req, res) => {

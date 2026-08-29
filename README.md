@@ -131,8 +131,11 @@ The API implements a **three-tier middleware cascade** that progressively escala
 - **multer** accepts files into memory (`memoryStorage`) — no temporary disk writes.
 - **File filter** rejects non-image MIME types.
 - **Size cap**: 2 MB hard limit (`MulterError` handling).
-- **sharp** resizes to 300×300 cover-fit and compresses to WebP (quality 80).
+- **sharp** resizes images:
+  - **Avatars**: 300×300 cover-fit, WebP quality 80
+  - **Film posters**: 200×285 cover-fit, WebP quality 90
 - **Old avatar cleanup**: On successful upload, the previous avatar file is deleted from disk to prevent storage bloat.
+- **Poster storage**: Film posters are saved to `../frontend/public/` for direct serving by the frontend.
 
 ### Token-Based Password Reset
 - **Generation**: `crypto.randomBytes(32)` produces a 64-character hex token.
@@ -269,6 +272,7 @@ SUSPENDED ──unsuspend()──► ACTIVE    │
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
 | `GET` | `/getFilmsAdmin` | Admin | Admin-facing film list with localized titles and genre counts. |
+| `POST` | `/addFilm` | Admin + multer | Creates film with multipart poster upload (200×285 WebP), metadata validation (rating 0-10, duration), multi-language translations, genre associations, and duplicate language prevention. |
 | `POST` | `/deleteFilm` | Admin + password | Deletes film record. Requires admin password re-verification. |
 | `POST` | `/addAdmin` | Admin | Creates new user with `role = 1` directly. Validates password complexity and email uniqueness. |
 
@@ -330,7 +334,7 @@ Movies-Backend/
 - [ ] **Prepared Statements** — Migrate all dynamic `searchQuery` concatenations to fully parameterized queries for defense-in-depth SQL injection protection.
 
 ### Content Management
-- [ ] **Film Creation Endpoint** — `POST /addFilm` with multipart poster upload, metadata validation, and automatic `film_translations` seeding.
+- [x] **Film Creation Endpoint** — `POST /addFilm` with multipart poster upload (client-side resizing to 200×285px and WebP conversion), server-side image processing via Sharp, metadata validation (rating 0-10, duration > 0), automatic `film_translations` insertion with duplicate language prevention, and `film_genres` junction table population.
 - [ ] **Film Editor** — `POST /editFilm` for updating base metadata and localized content.
 - [ ] **Genre Association API** — `POST /attachGenres` / `POST /detachGenres` for managing N:M relationships via the `film_genres` junction table.
 
