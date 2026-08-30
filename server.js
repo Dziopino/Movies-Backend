@@ -18,6 +18,7 @@ const optionalAuthMiddleware = require("./middleware/optionalAuthMiddleware");
 const adminMiddleware = require("./middleware/adminMiddleware");
 const {loadLanguages, isLanguageValid} = require("./utils/languageValidator");
 const checkIfUserIsAdmin = require("./utils/checkIfUserIsAdmin");
+const logActivity = require("./utils/activityLogger");
 require('dotenv').config();
 app.use(express.json());
 app.use(cors());
@@ -95,6 +96,10 @@ app.post('/checkLoginData', (req, res) => {
 
                     delete users[0].password;
 
+                    logActivity(users[0].id, 'USER_LOGGED_IN').catch(err => {
+                        console.error('Failed to log USER_LOGGED_IN activity:', err);
+                    });
+
                     return res.json({message: "Logged in successfully", token, user: users[0], success: true});
 
 
@@ -130,7 +135,7 @@ app.post('/addUser', async (req, res) => {
 
                 const insertedId = result.insertId;
 
-                connection.query("SELECT users.id, users.password, users.username, users.avatar_url, users.email, users.created_at, users.role, users.bio, users.language_code FROM users WHERE users.id = ?", [insertedId], (err, user) => {
+                connection.query("SELECT users.id, users.password, users.username, users.avatar_url, users.email, users.created_at, users.role, users.bio, users.language_code FROM users WHERE users.id = ?", [insertedId], async (err, user) => {
 
                     if (err) {
                         return res.json({message: "Error while registering"});
@@ -139,6 +144,12 @@ app.post('/addUser', async (req, res) => {
                     const token = generateToken(user[0]);
 
                     delete user[0].password;
+
+                    try {
+                        await logActivity(user[0].id, 'USER_REGISTERED');
+                    } catch (logErr) {
+                        console.error('Failed to log USER_REGISTERED activity:', logErr);
+                    }
 
                     res.json({message:"Registered successfully", token, user:user[0],success:true});
                 });
@@ -204,20 +215,30 @@ app.post("/likeToggle",authMiddleware, (req, res) => {
             return res.json({message: "Error while checking is film already favorite. Error: "+err});
         }
         if (result.length === 0 ){
-            connection.query("INSERT INTO `user_favorites`(`user_id`, `film_id`) VALUES (?,?)",[userId,filmId],(err, result) => {
+            connection.query("INSERT INTO `user_favorites`(`user_id`, `film_id`) VALUES (?,?)",[userId,filmId], async (err, result) => {
                 if (err) {
                     return res.json({message: "Error inserting user_favorites. Error: "+err});
                 }
                 if (result){
+                    try {
+                        await logActivity(userId, 'FILM_LIKED');
+                    } catch (logErr) {
+                        console.error('Failed to log FILM_LIKED activity:', logErr);
+                    }
                     return res.json({message:"Added successfully",body:result});
                 }
             })
         }else if(result.length === 1){
-            connection.query("DELETE FROM `user_favorites` WHERE `user_favorites`.`user_id` = ? AND `user_favorites`.`film_id` = ?",[userId,filmId],(err, result) => {
+            connection.query("DELETE FROM `user_favorites` WHERE `user_favorites`.`user_id` = ? AND `user_favorites`.`film_id` = ?",[userId,filmId], async (err, result) => {
                 if (err) {
                     return res.json({message: "Error deleting user_favorites. Error: "+err});
                 }
                 if (result){
+                    try {
+                        await logActivity(userId, 'FILM_UNLIKED');
+                    } catch (logErr) {
+                        console.error('Failed to log FILM_UNLIKED activity:', logErr);
+                    }
                     return res.json({message:"Deleted successfully",body:result});
                 }
             })
@@ -237,20 +258,30 @@ app.post("/watchedToggle",authMiddleware, (req, res) => {
             return res.json({message: "Error while checking is film already watched. Error: "+err});
         }
         if (result.length === 0 ){
-            connection.query("INSERT INTO `user_watched`(`user_id`, `film_id`) VALUES (?,?)",[userId,filmId],(err, result) => {
+            connection.query("INSERT INTO `user_watched`(`user_id`, `film_id`) VALUES (?,?)",[userId,filmId], async (err, result) => {
                 if (err) {
                     return res.json({message: "Error inserting user_watched. Error: "+err});
                 }
                 if (result){
+                    try {
+                        await logActivity(userId, 'FILM_WATCHED');
+                    } catch (logErr) {
+                        console.error('Failed to log FILM_WATCHED activity:', logErr);
+                    }
                     return res.json({message:"Added successfully",body:result});
                 }
             })
         }else if(result.length === 1){
-            connection.query("DELETE FROM `user_watched` WHERE `user_watched`.`user_id` = ? AND `user_watched`.`film_id` = ?",[userId,filmId],(err, result) => {
+            connection.query("DELETE FROM `user_watched` WHERE `user_watched`.`user_id` = ? AND `user_watched`.`film_id` = ?",[userId,filmId], async (err, result) => {
                 if (err) {
                     return res.json({message: "Error deleting user_watched. Error: "+err});
                 }
                 if (result){
+                    try {
+                        await logActivity(userId, 'FILM_UNWATCHED');
+                    } catch (logErr) {
+                        console.error('Failed to log FILM_UNWATCHED activity:', logErr);
+                    }
                     return res.json({message:"Deleted successfully",body:result});
                 }
             })
@@ -343,21 +374,26 @@ app.get("/getLanguageCodes", (req, res) => {
     })
 })
 
-app.post("/editUserBio", authMiddleware, (req, res) => {
+app.post("/editUserBio", authMiddleware, async (req, res) => {
     const userId = req.user.id;
     const {userBio} = req.body;
 
-    connection.query("UPDATE users SET users.bio=? WHERE users.id = ?",[userBio,userId],(err, result) => {
+    connection.query("UPDATE users SET users.bio=? WHERE users.id = ?",[userBio,userId], async (err, result) => {
         if (err) {
             return res.json({message: "Error while updating user's bio"});
         }
         if (result){
+            try {
+                await logActivity(userId, 'BIO_UPDATED');
+            } catch (logErr) {
+                console.error('Failed to log BIO_UPDATED activity:', logErr);
+            }
             return res.json({message:"User's bio updated successfully"});
         }
     })
 })
 
-app.post("/changeUserLanguage", authMiddleware, (req, res) => {
+app.post("/changeUserLanguage", authMiddleware, async (req, res) => {
     const userId = req.user.id;
     const {userLanguageCode} = req.body;
 
@@ -370,17 +406,22 @@ app.post("/changeUserLanguage", authMiddleware, (req, res) => {
         return res.json({message: "This language is not available"});
     }
 
-    connection.query("UPDATE `users` SET `language_code`= ? WHERE users.id = ?",[userLanguageCode,userId],(err, result) => {
+    connection.query("UPDATE `users` SET `language_code`= ? WHERE users.id = ?",[userLanguageCode,userId], async (err, result) => {
         if (err) {
             return res.json({message: "Error while updating user's language"});
         }
         if (result){
+            try {
+                await logActivity(userId, 'LANGUAGE_CHANGED');
+            } catch (logErr) {
+                console.error('Failed to log LANGUAGE_CHANGED activity:', logErr);
+            }
             return res.json({message:"User's language changed successfully"});
         }
     })
 })
 
-app.post("/editUserName", authMiddleware, (req, res) => {
+app.post("/editUserName", authMiddleware, async (req, res) => {
     const userId = req.user.id;
     const {userName} = req.body;
 
@@ -388,11 +429,16 @@ app.post("/editUserName", authMiddleware, (req, res) => {
         return res.json({message: "New user name is empty"});
     }
 
-    connection.query("UPDATE `users` SET `username`= ? WHERE users.id = ?",[userName,userId],(err, result) => {
+    connection.query("UPDATE `users` SET `username`= ? WHERE users.id = ?",[userName,userId], async (err, result) => {
         if (err) {
             return res.json({message: "Error while updating username"});
         }
         if (result){
+            try {
+                await logActivity(userId, 'USERNAME_CHANGED');
+            } catch (logErr) {
+                console.error('Failed to log USERNAME_CHANGED activity:', logErr);
+            }
             return res.json({message:"Username changed successfully",body:result});
         }
     })
@@ -460,10 +506,16 @@ app.post("/uploadAvatar", authMiddleware, upload.single("avatar"), async (req, r
                 }
 
 
-                connection.query("UPDATE users SET avatar_url=? WHERE id=?", [newAvatarUrl, userId], (err2)=>{
+                connection.query("UPDATE users SET avatar_url=? WHERE id=?", [newAvatarUrl, userId], async (err2)=>{
 
                         if(err2){
                             return res.json({message:"DB update error"});
+                        }
+
+                        try {
+                            await logActivity(userId, 'AVATAR_UPDATED');
+                        } catch (logErr) {
+                            console.error('Failed to log AVATAR_UPDATED activity:', logErr);
                         }
 
                         res.json({message:"Avatar updated successfully", avatar_url:newAvatarUrl});
@@ -561,9 +613,15 @@ app.post("/requestPasswordReset", (req, res) => {
         const token = crypto.randomBytes(32).toString("hex");
         const expiry = new Date(Date.now() + 1000*60*15);
 
-        connection.query("UPDATE users SET reset_token=?, reset_token_expiry=? WHERE id=?", [token, expiry, id], (err) => {
+        connection.query("UPDATE users SET reset_token=?, reset_token_expiry=? WHERE id=?", [token, expiry, id], async (err) => {
             if (err) {
                 return res.status(500).json({message:"Database error"});
+            }
+
+            try {
+                await logActivity(id, 'PASSWORD_RESET_REQUESTED');
+            } catch (logErr) {
+                console.error('Failed to log PASSWORD_RESET_REQUESTED activity:', logErr);
             }
 
             transporter.sendMail({
@@ -642,12 +700,18 @@ app.post("/resetPassword/:token", async (req,res) => {
             try {
                 const hashedPassword = await hashPassword(password);
 
-                connection.query("UPDATE users SET password=?, reset_token=NULL, reset_token_expiry=NULL WHERE id=?", [hashedPassword, result[0].id], (err, result) => {
+                connection.query("UPDATE users SET password=?, reset_token=NULL, reset_token_expiry=NULL WHERE id=?", [hashedPassword, result[0].id], async (err, updateResult) => {
 
                         if (err) {
                             return res.status(500).json({
                                 message:"✗ Database error", isChanged: false
                             });
+                        }
+
+                        try {
+                            await logActivity(result[0].id, 'PASSWORD_RESET_COMPLETED');
+                        } catch (logErr) {
+                            console.error('Failed to log PASSWORD_RESET_COMPLETED activity:', logErr);
                         }
 
                         return res.json({
@@ -750,12 +814,18 @@ app.post("/banUser", authMiddleware, adminMiddleware, (req,res) => {
             return res.json({success: false, message: "you_cannot_ban_another_admin"});
         }
 
-        connection.query(`UPDATE users SET status = "BANNED", suspended_until = NULL,suspend_reason = NULL, suspended_at = NULL,suspended_by = NULL, ban_reason = ?, banned_at = NOW(), banned_by = ? WHERE id = ?`,[banReason,banBy,userId],(err, result) => {
+        connection.query(`UPDATE users SET status = "BANNED", suspended_until = NULL,suspend_reason = NULL, suspended_at = NULL,suspended_by = NULL, ban_reason = ?, banned_at = NOW(), banned_by = ? WHERE id = ?`,[banReason,banBy,userId], async (err, result) => {
             if (err){
                 return res.status(500).json({message:"database_error",success:false});
             }
             if(result.affectedRows === 0){
                 return res.json({success:false, message:"user_not_found"});
+            }
+
+            try {
+                await logActivity(userId, 'USER_BANNED');
+            } catch (logErr) {
+                console.error('Failed to log USER_BANNED activity:', logErr);
             }
 
             return res.json({message: "user_banned_successfully", success: true});
@@ -804,12 +874,18 @@ app.post("/suspendUser", authMiddleware, adminMiddleware, (req,res) => {
             return res.json({success: false, message: "you_cannot_suspend_another_admin"});
         }
 
-        connection.query(`UPDATE users SET status = "SUSPENDED", suspended_until = ? ,suspend_reason = ?, suspended_at = NOW(),suspended_by = ?, ban_reason = NULL, banned_at = NULL, banned_by = NULL WHERE id = ?`,[suspendUntil, suspendReason, suspendBy, userId],(err,result) => {
+        connection.query(`UPDATE users SET status = "SUSPENDED", suspended_until = ? ,suspend_reason = ?, suspended_at = NOW(),suspended_by = ?, ban_reason = NULL, banned_at = NULL, banned_by = NULL WHERE id = ?`,[suspendUntil, suspendReason, suspendBy, userId], async (err,result) => {
             if (err){
                 return res.status(500).json({message:"database_error",success:false});
             }
             if(result.affectedRows === 0){
                 return res.json({success:false, message:"user_not_found"});
+            }
+
+            try {
+                await logActivity(userId, 'USER_SUSPENDED');
+            } catch (logErr) {
+                console.error('Failed to log USER_SUSPENDED activity:', logErr);
             }
 
             return res.json({message: "user_suspended_successfully", success: true});
@@ -829,12 +905,18 @@ app.post("/unBanUser", authMiddleware, adminMiddleware, (req,res) => {
         return res.json({message:"user_is_not_banned", success: false});
     }
 
-    connection.query(`UPDATE users SET status = "ACTIVE", ban_reason = NULL, banned_at = NULL, banned_by = NULL WHERE id = ?`,[userId],(err,result) => {
+    connection.query(`UPDATE users SET status = "ACTIVE", ban_reason = NULL, banned_at = NULL, banned_by = NULL WHERE id = ?`,[userId], async (err,result) => {
         if (err){
             return res.status(500).json({message:"database_error",success:false});
         }
         if(result.affectedRows === 0){
             return res.json({success:false, message:"user_not_found"});
+        }
+
+        try {
+            await logActivity(userId, 'USER_UNBANNED');
+        } catch (logErr) {
+            console.error('Failed to log USER_UNBANNED activity:', logErr);
         }
 
         return res.json({message: "user_unbanned_successfully", success: true});
@@ -853,12 +935,18 @@ app.post("/unSuspendUser", authMiddleware, adminMiddleware, (req,res) => {
         return res.json({message:"user_is_not_suspended", success: false});
     }
 
-    connection.query(`UPDATE users SET status = "ACTIVE", suspended_until = NULL, suspend_reason = NULL, suspended_at = NULL, suspended_by = NULL WHERE id = ?`,[userId],(err, result) => {
+    connection.query(`UPDATE users SET status = "ACTIVE", suspended_until = NULL, suspend_reason = NULL, suspended_at = NULL, suspended_by = NULL WHERE id = ?`,[userId], async (err, result) => {
         if (err){
             return res.status(500).json({message:"database_error",success:false});
         }
         if(result.affectedRows === 0){
             return res.json({success:false, message:"user_not_found"});
+        }
+
+        try {
+            await logActivity(userId, 'USER_UNSUSPENDED');
+        } catch (logErr) {
+            console.error('Failed to log USER_UNSUSPENDED activity:', logErr);
         }
 
         return res.json({message: "user_unsuspended_successfully", success: true});
@@ -892,13 +980,19 @@ app.post("/promoteUser", authMiddleware, adminMiddleware, (req,res)=>{
                     return res.json({success:false, message:"invalid_password"});
                 }
 
-                connection.query("UPDATE users SET role=1 WHERE id=?", [userId], (err,result)=>{
+                connection.query("UPDATE users SET role=1 WHERE id=?", [userId], async (err,result)=>{
 
                         if(err){
                             return res.status(500).json({success:false, message:"database_error"});
                         }
                         if(result.affectedRows === 0){
                             return res.json({success:false, message:"user_not_found"});
+                        }
+
+                        try {
+                            await logActivity(userId, 'USER_PROMOTED');
+                        } catch (logErr) {
+                            console.error('Failed to log USER_PROMOTED activity:', logErr);
                         }
 
                         return res.json({success:true, message:"user_promoted_to_admin"});
@@ -1001,13 +1095,19 @@ app.post("/deleteGenre", authMiddleware, adminMiddleware, (req,res)=>{
                     return res.json({success:false, message:"invalid_password"});
                 }
 
-                connection.query("DELETE FROM genres WHERE id = ?;", [genreId], (err,result)=>{
+                connection.query("DELETE FROM genres WHERE id = ?;", [genreId], async (err,result)=>{
 
                         if(err){
                             return res.status(500).json({success:false, message:"database_error"});
                         }
                         if(result.affectedRows === 0){
                             return res.json({success:false, message:"genre_not_found"});
+                        }
+
+                        try {
+                            await logActivity(adminId, 'GENRE_DELETED');
+                        } catch (logErr) {
+                            console.error('Failed to log GENRE_DELETED activity:', logErr);
                         }
 
                         return res.json({success:true, message:"genre_deleted_successfully"});
@@ -1018,9 +1118,10 @@ app.post("/deleteGenre", authMiddleware, adminMiddleware, (req,res)=>{
     );
 });
 
-app.post("/editGenre", authMiddleware, adminMiddleware, (req,res) => {
+app.post("/editGenre", authMiddleware, adminMiddleware, async (req,res) => {
     const genreId = req.body.genreId;
     let newGenreName = req.body.newGenreName;
+    const userId = req.user.id;
 
     newGenreName = newGenreName.trim().toLowerCase();
 
@@ -1032,7 +1133,7 @@ app.post("/editGenre", authMiddleware, adminMiddleware, (req,res) => {
         return res.json({message:"no_new_genre_name_found", success: false});
     }
 
-    connection.query(`UPDATE genres SET genres.name = ? WHERE id = ?`,[newGenreName, genreId],(err, result) => {
+    connection.query(`UPDATE genres SET genres.name = ? WHERE id = ?`,[newGenreName, genreId], async (err, result) => {
         if (err) {
             if (err.code === "ER_DUP_ENTRY") {
                 return res.json({success: false, message: "genre_already_exists"});
@@ -1044,13 +1145,20 @@ app.post("/editGenre", authMiddleware, adminMiddleware, (req,res) => {
             return res.json({success:false, message:"genre_not_found"});
         }
 
+        try {
+            await logActivity(userId, 'GENRE_UPDATED');
+        } catch (logErr) {
+            console.error('Failed to log GENRE_UPDATED activity:', logErr);
+        }
+
         return res.json({message: "genre_edited_successfully", success: true});
 
     })
 })
 
-app.post("/addGenre", authMiddleware, adminMiddleware, (req,res) => {
+app.post("/addGenre", authMiddleware, adminMiddleware, async (req,res) => {
     let newGenreName = req.body.newGenreName;
+    const userId = req.user.id;
 
     newGenreName = newGenreName.trim().toLowerCase();
 
@@ -1058,13 +1166,19 @@ app.post("/addGenre", authMiddleware, adminMiddleware, (req,res) => {
         return res.json({message:"no_new_genre_name_found", success: false});
     }
 
-    connection.query(`INSERT INTO genres (genres.name) VALUES (?)`,[newGenreName],(err, result) => {
+    connection.query(`INSERT INTO genres (genres.name) VALUES (?)`,[newGenreName], async (err, result) => {
         if (err) {
             if (err.code === "ER_DUP_ENTRY") {
                 return res.json({success: false, message: "genre_already_exists"});
             }
 
             return res.status(500).json({success: false, message: "database_error"});
+        }
+
+        try {
+            await logActivity(userId, 'GENRE_CREATED');
+        } catch (logErr) {
+            console.error('Failed to log GENRE_CREATED activity:', logErr);
         }
 
         return res.json({message: "genre_added_successfully", success: true});
@@ -1134,13 +1248,19 @@ app.post("/deleteFilm", authMiddleware, adminMiddleware, (req,res)=>{
                     return res.json({success:false, message:"invalid_password"});
                 }
 
-                connection.query("DELETE FROM films WHERE id = ?;", [filmId], (err,result)=>{
+                connection.query("DELETE FROM films WHERE id = ?;", [filmId], async (err,result)=>{
 
                         if(err){
                             return res.status(500).json({success:false, message:"database_error"});
                         }
                         if(result.affectedRows === 0){
                             return res.json({success:false, message:"film_not_found"});
+                        }
+
+                        try {
+                            await logActivity(adminId, 'FILM_DELETED');
+                        } catch (logErr) {
+                            console.error('Failed to log FILM_DELETED activity:', logErr);
                         }
 
                         return res.json({success:true, message:"film_deleted_successfully"});
@@ -1153,6 +1273,7 @@ app.post("/deleteFilm", authMiddleware, adminMiddleware, (req,res)=>{
 
 app.post("/addFilm", authMiddleware, adminMiddleware, upload.single('poster'), async (req, res) => {
     const { rating, release_date, duration, translations, genres } = req.body;
+    const userId = req.user.id;
 
     if (!req.file || rating === undefined || !release_date || !duration || !translations) {
         return res.json({ message: "missing_required_fields", success: false });
@@ -1244,6 +1365,9 @@ app.post("/addFilm", authMiddleware, adminMiddleware, upload.single('poster'), a
                         }
                         completedTranslations++;
                         if (completedTranslations === totalTranslations && completedGenres === totalGenres && !hasError) {
+                            logActivity(userId, 'FILM_CREATED').catch(logErr => {
+                                console.error('Failed to log FILM_CREATED activity:', logErr);
+                            });
                             return res.json({ success: true, message: "film_added_successfully", filmId: filmId });
                         }
                     }
@@ -1263,6 +1387,9 @@ app.post("/addFilm", authMiddleware, adminMiddleware, upload.single('poster'), a
                                 }
                                 completedGenres++;
                                 if (completedTranslations === totalTranslations && completedGenres === totalGenres && !hasError) {
+                                    logActivity(userId, 'FILM_CREATED').catch(logErr => {
+                                        console.error('Failed to log FILM_CREATED activity:', logErr);
+                                    });
                                     return res.json({ success: true, message: "film_added_successfully", filmId: filmId });
                                 }
                             }
@@ -1298,7 +1425,6 @@ app.post('/addAdmin',authMiddleware, adminMiddleware, async (req, res) => {
         const hash = await hashPassword(password);
 
         connection.query("INSERT INTO `users`(`password`, `username`, `email`, `role`) VALUES (?,?,?,1)", [hash, username, email], (err) => {
-
                 if (err) {
                     if (err.code === "ER_DUP_ENTRY") {
                         return res.json({message:"email_already_exists",success:false});
@@ -1306,7 +1432,6 @@ app.post('/addAdmin',authMiddleware, adminMiddleware, async (req, res) => {
 
                     return res.json({message:"error_while_registering",success:false});
                 }
-
                 return res.json({message:"admin_created_successfully",success:true})
             }
         );
@@ -1319,6 +1444,7 @@ app.post('/addAdmin',authMiddleware, adminMiddleware, async (req, res) => {
 app.put("/updateFilm/:id", authMiddleware, adminMiddleware, upload.single('poster'), async (req, res) => {
     const filmId = req.params.id;
     const { rating, release_date, duration, translations, genres } = req.body;
+    const userId = req.user.id;
 
     if (!filmId) {
         return res.json({ message: "film_id_missing", success: false });
@@ -1361,7 +1487,6 @@ app.put("/updateFilm/:id", authMiddleware, adminMiddleware, upload.single('poste
         if (hasInvalidTranslation) {
             return res.json({ message: "invalid_translation_data", success: false });
         }
-
         const languageCodes = parsedTranslations.map(t => t.lang_code);
         const uniqueLanguageCodes = new Set(languageCodes);
         if (languageCodes.length !== uniqueLanguageCodes.size) {
@@ -1430,7 +1555,7 @@ app.put("/updateFilm/:id", authMiddleware, adminMiddleware, upload.single('poste
                 const totalOperations = (parsedTranslations ? 1 : 0) + (parsedGenres !== null ? 1 : 0);
 
                 if (totalOperations === 0) {
-                    return connection.commit((err) => {
+                    return connection.commit(async (err) => {
                         if (err) {
                             return connection.rollback(() => {
                                 if (outputPath) {
@@ -1439,6 +1564,11 @@ app.put("/updateFilm/:id", authMiddleware, adminMiddleware, upload.single('poste
                                 return res.status(500).json({ success: false, message: "commit_error" });
                             });
                         }
+                        try {
+                            await logActivity(userId, 'FILM_UPDATED');
+                        } catch (logErr) {
+                            console.error('Failed to log FILM_UPDATED activity:', logErr);
+                        }
                         return res.json({ success: true, message: "film_updated_successfully" });
                     });
                 }
@@ -1446,7 +1576,7 @@ app.put("/updateFilm/:id", authMiddleware, adminMiddleware, upload.single('poste
                 const checkCompletion = () => {
                     operationsCompleted++;
                     if (operationsCompleted === totalOperations) {
-                        connection.commit((err) => {
+                        connection.commit(async (err) => {
                             if (err) {
                                 return connection.rollback(() => {
                                     if (outputPath) {
@@ -1454,6 +1584,11 @@ app.put("/updateFilm/:id", authMiddleware, adminMiddleware, upload.single('poste
                                     }
                                     return res.status(500).json({ success: false, message: "commit_error" });
                                 });
+                            }
+                            try {
+                                await logActivity(userId, 'FILM_UPDATED');
+                            } catch (logErr) {
+                                console.error('Failed to log FILM_UPDATED activity:', logErr);
                             }
                             return res.json({ success: true, message: "film_updated_successfully" });
                         });
@@ -1531,6 +1666,224 @@ app.put("/updateFilm/:id", authMiddleware, adminMiddleware, upload.single('poste
     });
 })
 
+
+app.get("/api/admin/dashboard/overview", authMiddleware, adminMiddleware, (req, res) => {
+    const queries = {
+        totalMovies: new Promise((resolve, reject) => {
+            connection.query("SELECT COUNT(*) AS count FROM films", (err, result) => {
+                if (err) reject(err);
+                else resolve(result[0].count);
+            });
+        }),
+        totalUsers: new Promise((resolve, reject) => {
+            connection.query("SELECT COUNT(*) AS count FROM users", (err, result) => {
+                if (err) reject(err);
+                else resolve(result[0].count);
+            });
+        }),
+        totalLogs: new Promise((resolve, reject) => {
+            connection.query("SELECT COUNT(*) AS count FROM user_activity", (err, result) => {
+                if (err) reject(err);
+                else resolve(result[0].count);
+            });
+        }),
+        lineChartData: new Promise((resolve, reject) => {
+            connection.query(`SELECT DATE(created_at) as date, COUNT(*) as value FROM user_activity WHERE created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY) GROUP BY DATE(created_at) ORDER BY date ASC`,  (err, result) => {
+                    if (err) reject(err);
+                    else resolve(result);
+                }
+            );
+        }),
+        pieChartData: new Promise((resolve, reject) => {
+            connection.query(`SELECT action as name, COUNT(*) as value FROM user_activity GROUP BY action ORDER BY value DESC LIMIT 5`, (err, result) => {
+                    if (err) reject(err);
+                    else resolve(result);
+                }
+            );
+        })
+    };
+
+    Promise.all([queries.totalMovies, queries.totalUsers, queries.totalLogs, queries.lineChartData, queries.pieChartData]).then(([totalMovies, totalUsers, totalLogs, lineChartData, pieChartData]) => {
+        res.json({
+            success: true,
+            kpi: {totalMovies, totalUsers, totalLogs},
+            lineChartData,
+            pieChartData
+        });
+    })
+    .catch((error) => {
+        console.error('Dashboard overview error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'database_error'
+        });
+    });
+});
+
+app.get("/api/admin/dashboard/users-analytics", authMiddleware, adminMiddleware, (req, res) => {
+    const queries = {
+        bannedCount: new Promise((resolve, reject) => {
+            connection.query("SELECT COUNT(*) AS count FROM user_activity WHERE action = 'USER_BANNED'", (err, result) => {
+                    if (err) reject(err);
+                    else resolve(result[0].count);
+                }
+            );
+        }),
+        suspendedCount: new Promise((resolve, reject) => {
+            connection.query("SELECT COUNT(*) AS count FROM user_activity WHERE action = 'USER_SUSPENDED'", (err, result) => {
+                    if (err) reject(err);
+                    else resolve(result[0].count);
+                }
+            );
+        }),
+        registrationChartData: new Promise((resolve, reject) => {
+            connection.query(`SELECT DATE(created_at) as date, COUNT(*) as value FROM user_activity WHERE action = 'USER_REGISTERED' AND created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY) GROUP BY DATE(created_at) ORDER BY date ASC`, (err, result) => {
+                    if (err) reject(err);
+                    else resolve(result);
+                }
+            );
+        })
+    };
+
+    Promise.all([queries.bannedCount, queries.suspendedCount, queries.registrationChartData]).then(([bannedCount, suspendedCount, registrationChartData]) => {
+        res.json({
+            success: true,
+            moderationStats: {bannedCount, suspendedCount},
+            registrationChartData
+        });
+    })
+    .catch((error) => {
+        console.error('Users analytics error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'database_error'
+        });
+    });
+});
+
+app.get("/api/admin/dashboard/audit-logs", authMiddleware, adminMiddleware, (req, res) => {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const actionFilter = req.query.action || '';
+    const usernameFilter = req.query.username || '';
+    const offset = (page - 1) * limit;
+
+    let whereClauses = [];
+    let queryParams = [];
+
+    if (actionFilter) {
+        whereClauses.push('user_activity.action = ?');
+        queryParams.push(actionFilter);
+    }
+
+    if (usernameFilter) {
+        whereClauses.push('users.username LIKE ?');
+        queryParams.push(`%${usernameFilter}%`);
+    }
+
+    const whereSQL = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
+
+    const logsQuery = `SELECT user_activity.id, user_activity.action, user_activity.created_at, users.username, users.id as user_id FROM user_activity INNER JOIN users ON user_activity.user_id = users.id  ${whereSQL} ORDER BY user_activity.created_at DESC LIMIT ? OFFSET ?`;
+
+    const countQuery = `SELECT COUNT(*) as total FROM user_activity INNER JOIN users ON user_activity.user_id = users.id ${whereSQL}`;
+
+    const logsPromise = new Promise((resolve, reject) => {
+        connection.query(logsQuery, [...queryParams, limit, offset], (err, result) => {
+            if (err) reject(err);
+            else resolve(result);
+        });
+    });
+
+    const countPromise = new Promise((resolve, reject) => {
+        connection.query(countQuery, queryParams, (err, result) => {
+            if (err) reject(err);
+            else resolve(result[0].total);
+        });
+    });
+
+    Promise.all([logsPromise, countPromise])
+    .then(([logs, totalRows]) => {
+        const totalPages = Math.ceil(totalRows / limit);
+        res.json({
+            success: true,
+            logs,
+            pagination: {currentPage: page, totalPages, totalRows}
+        });
+    })
+    .catch((error) => {
+        console.error('Audit logs error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'database_error'
+        });
+    });
+});
+
+app.get("/api/admin/dashboard/films-analytics", authMiddleware, adminMiddleware, (req, res) => {
+    const queries = {
+        topPopularFilms: new Promise((resolve, reject) => {
+            connection.query(`
+                SELECT
+                    f.id,
+                    COALESCE(ft.title, 'Untitled') as title,
+                    COUNT(DISTINCT uf.user_id) as likes_count,
+                    COUNT(DISTINCT uw.user_id) as watched_count,
+                    (COUNT(DISTINCT uf.user_id) + COUNT(DISTINCT uw.user_id)) as popularity_score
+                FROM films f
+                LEFT JOIN film_translations ft ON f.id = ft.film_id AND ft.language_code = 'en'
+                LEFT JOIN user_favorites uf ON f.id = uf.film_id
+                LEFT JOIN user_watched uw ON f.id = uw.film_id
+                GROUP BY f.id
+                HAVING popularity_score > 0
+                ORDER BY popularity_score DESC
+                LIMIT 10
+            `, (err, result) => {
+                    if (err) reject(err);
+                    else resolve(result);
+                }
+            );
+        }),
+        averageRating: new Promise((resolve, reject) => {
+            connection.query("SELECT AVG(rating) as average_rating, MIN(rating) as min_rating, MAX(rating) as max_rating FROM films", (err, result) => {
+                    if (err) reject(err);
+                    else resolve(result[0]);
+                }
+            );
+        }),
+        recentFilms: new Promise((resolve, reject) => {
+            connection.query(`SELECT COUNT(DISTINCT CASE WHEN ua.created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY) AND ua.action = 'FILM_CREATED' THEN ua.id END) as last_week, COUNT(DISTINCT CASE WHEN ua.created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY) AND ua.action = 'FILM_CREATED' THEN ua.id END) as last_month, COUNT(DISTINCT CASE WHEN ua.created_at >= DATE_SUB(NOW(), INTERVAL 1 YEAR) AND ua.action = 'FILM_CREATED' THEN ua.id END) as last_year FROM user_activity ua WHERE ua.action = 'FILM_CREATED'`, (err, result) => {
+                    if (err) reject(err);
+                    else resolve(result[0]);
+                }
+            );
+        }),
+        genreDistribution: new Promise((resolve, reject) => {
+            connection.query(`SELECT g.name, COUNT(fg.film_id) as value FROM genres g LEFT JOIN film_genres fg ON g.id = fg.genre_id GROUP BY g.id, g.name HAVING value > 0 ORDER BY value DESC`,  (err, result) => {
+                    if (err) reject(err);
+                    else resolve(result);
+                }
+            );
+        })
+    };
+
+    Promise.all([queries.topPopularFilms,  queries.averageRating, queries.recentFilms, queries.genreDistribution])
+    .then(([topPopularFilms, averageRating, recentFilms, genreDistribution]) => {
+        res.json({
+            success: true,
+            topPopularFilms,
+            averageRating,
+            recentFilms,
+            genreDistribution
+        });
+    })
+    .catch((error) => {
+        console.error('Films analytics error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'database_error'
+        });
+    });
+});
 
 
 if (require.main === module) {

@@ -272,9 +272,22 @@ SUSPENDED ──unsuspend()──► ACTIVE    │
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
 | `GET` | `/getFilmsAdmin` | Admin | Admin-facing film list with localized titles and genre counts. |
+| `GET` | `/getFilmTranslations/:id` | Admin | Returns all translations for a specific film with language codes, titles, and descriptions. |
+| `GET` | `/getFilmGenres/:id` | Admin | Returns all genres assigned to a specific film. |
+| `GET` | `/getAllGenresList` | Admin | Returns complete list of all available genres for film assignment. |
 | `POST` | `/addFilm` | Admin + multer | Creates film with multipart poster upload (200×285 WebP), metadata validation (rating 0-10, duration), multi-language translations, genre associations, and duplicate language prevention. |
+| `PUT` | `/updateFilm/:id` | Admin + multer | Updates film metadata (rating, release date, duration), optionally uploads new poster, replaces all translations, and reassigns genres. Uses SQL transactions for atomic updates. |
 | `POST` | `/deleteFilm` | Admin + password | Deletes film record. Requires admin password re-verification. |
 | `POST` | `/addAdmin` | Admin | Creates new user with `role = 1` directly. Validates password complexity and email uniqueness. |
+
+### Admin — Dashboard Analytics
+
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| `GET` | `/api/admin/dashboard/overview` | Admin | Dashboard overview with total counts: all films, all users, active users. |
+| `GET` | `/api/admin/dashboard/films-analytics` | Admin | Film analytics data: top 10 popular films (by likes/watched), average rating with min/max range, films added in last week/month/year, genre distribution. |
+| `GET` | `/api/admin/dashboard/users-analytics` | Admin | User analytics data: moderation stats (banned/suspended counts), 7-day registration trend chart data. |
+| `GET` | `/api/admin/dashboard/audit-logs` | Admin | Paginated audit logs (50/page) with user actions: film liked/unliked/watched/unwatched, sorted by timestamp descending. |
 
 ---
 
@@ -335,12 +348,18 @@ Movies-Backend/
 
 ### Content Management
 - [x] **Film Creation Endpoint** — `POST /addFilm` with multipart poster upload (client-side resizing to 200×285px and WebP conversion), server-side image processing via Sharp, metadata validation (rating 0-10, duration > 0), automatic `film_translations` insertion with duplicate language prevention, and `film_genres` junction table population.
-- [ ] **Film Editor** — `POST /editFilm` for updating base metadata and localized content.
-- [ ] **Genre Association API** — `POST /attachGenres` / `POST /detachGenres` for managing N:M relationships via the `film_genres` junction table.
+- [x] **Film Editor** — `PUT /updateFilm/:id` for updating base metadata (rating, release date, duration), poster replacement with Sharp processing, complete translation management (add/edit/remove), and genre reassignment. Implements SQL transactions for atomicity and rollback on failure.
+- [x] **Film Detail Endpoints** — `GET /getFilmTranslations/:id`, `GET /getFilmGenres/:id`, and `GET /getAllGenresList` for fetching all translations, assigned genres, and available genres for the admin film editor interface.
+
+### Analytics & Dashboard
+- [x] **Dashboard Overview** — `GET /api/admin/dashboard/overview` providing aggregate metrics: total films, total users, active users count.
+- [x] **Film Analytics Endpoint** — `GET /api/admin/dashboard/films-analytics` delivering: top 10 most popular films (by likes/watched), average rating with min/max range, recent additions (last week/month/year), genre distribution data for pie chart visualization.
+- [x] **User Analytics Endpoint** — `GET /api/admin/dashboard/users-analytics` providing: moderation statistics (banned/suspended counts), 7-day user registration trend for time-series charts.
+- [x] **Audit Logs Endpoint** — `GET /api/admin/dashboard/audit-logs` with server-side pagination (50 records/page), tracking user actions on films (like/unlike/watched/unwatched) with timestamps and user attribution.
 
 ### Observability & Audit
-- [ ] **`user_activity` Table** — Immutable audit log capturing: admin bans, user favorites, watched toggles, failed logins.
-- [ ] **Activity Stream Endpoint** — `GET /getActivityLog` with pagination, filtering by actor type and action category.
+- [ ] **Enhanced `user_activity` Table** — Extend audit log to capture admin actions: bans, suspensions, promotions, and failed login attempts with IP attribution.
+- [ ] **Activity Stream Filtering** — Advanced query parameters for filtering audit logs by actor type, action category, date range, and specific users.
 - [ ] **Failed Auth Tracking** — Schema extension to store IP, timestamp, and targeted account for brute-force analysis.
 
 ### Security & Performance
