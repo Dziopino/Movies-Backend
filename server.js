@@ -506,6 +506,45 @@ app.get("/getFilm/:id", optionalAuthMiddleware, (req, res) => {
     );
 });
 
+app.get("/getFilmTranslations/:id", authMiddleware, adminMiddleware, (req, res) => {
+    const filmId = req.params.id;
+
+    if (!filmId) {
+        return res.json({ message: "film_id_missing", success: false });
+    }
+
+    connection.query("SELECT language_code AS lang_code, title, description FROM film_translations WHERE film_id = ? ORDER BY language_code", [filmId], (err, result) => {
+        if (err) {
+            return res.status(500).json({ message: "database_error", success: false });
+        }
+        return res.json({ body: result, success: true });
+    });
+});
+
+app.get("/getFilmGenres/:id", authMiddleware, adminMiddleware, (req, res) => {
+    const filmId = req.params.id;
+
+    if (!filmId) {
+        return res.json({ message: "film_id_missing", success: false });
+    }
+
+    connection.query("SELECT genres.id, genres.name FROM film_genres INNER JOIN genres ON film_genres.genre_id = genres.id WHERE film_genres.film_id = ? ORDER BY genres.name", [filmId], (err, result) => {
+        if (err) {
+            return res.status(500).json({ message: "database_error", success: false });
+        }
+        return res.json({ body: result, success: true });
+    });
+});
+
+app.get("/getAllGenresList", authMiddleware, adminMiddleware, (req, res) => {
+    connection.query("SELECT id, name FROM genres ORDER BY name", (err, result) => {
+        if (err) {
+            return res.status(500).json({ message: "database_error", success: false });
+        }
+        return res.json({ body: result, success: true });
+    });
+});
+
 app.post("/requestPasswordReset", (req, res) => {
     const {email} = req.body;
 
@@ -1275,6 +1314,221 @@ app.post('/addAdmin',authMiddleware, adminMiddleware, async (req, res) => {
     } catch (err) {
         return res.json({message: "password_hashing_error",success:false});
     }
+})
+
+app.put("/updateFilm/:id", authMiddleware, adminMiddleware, upload.single('poster'), async (req, res) => {
+    const filmId = req.params.id;
+    const { rating, release_date, duration, translations, genres } = req.body;
+
+    if (!filmId) {
+        return res.json({ message: "film_id_missing", success: false });
+    }
+
+    if (!rating || !release_date || !duration) {
+        return res.json({ message: "missing_required_fields", success: false });
+    }
+
+    let parsedTranslations = null;
+    if (translations) {
+        try {
+            parsedTranslations = typeof translations === 'string' ? JSON.parse(translations) : translations;
+        } catch (e) {
+            return res.json({ message: "invalid_translation_format", success: false });
+        }
+    }
+
+    let parsedGenres = null;
+    if (genres) {
+        try {
+            parsedGenres = typeof genres === 'string' ? JSON.parse(genres) : genres;
+        } catch (e) {
+            return res.json({ message: "invalid_genres_format", success: false });
+        }
+    }
+
+    const parsedRating = parseFloat(rating);
+    if (isNaN(parsedRating) || parsedRating < 0 || parsedRating > 10) {
+        return res.json({ message: "invalid_rating", success: false });
+    }
+
+    const parsedDuration = parseInt(duration);
+    if (isNaN(parsedDuration) || parsedDuration <= 0) {
+        return res.json({ message: "invalid_duration", success: false });
+    }
+
+    if (parsedTranslations && Array.isArray(parsedTranslations)) {
+        const hasInvalidTranslation = parsedTranslations.some(t => !t.lang_code || !t.title || !t.title.trim());
+        if (hasInvalidTranslation) {
+            return res.json({ message: "invalid_translation_data", success: false });
+        }
+
+        const languageCodes = parsedTranslations.map(t => t.lang_code);
+        const uniqueLanguageCodes = new Set(languageCodes);
+        if (languageCodes.length !== uniqueLanguageCodes.size) {
+            return res.json({ message: "duplicate_language_codes", success: false });
+        }
+    }
+
+    connection.beginTransaction(async (err) => {
+        if (err) {
+            return res.status(500).json({ success: false, message: "transaction_start_error" });
+        }
+
+        try {
+            let posterUrl = null;
+            let outputPath = null;
+
+            if (req.file) {
+                const timestamp = Date.now();
+                const fileName = `poster_${timestamp}.webp`;
+                outputPath = path.join(__dirname, '../frontend/public', fileName);
+
+                await sharp(req.file.buffer)
+                    .resize(200, 285, {
+                        fit: 'cover',
+                        position: 'center'
+                    })
+                    .webp({ quality: 90 })
+                    .toFile(outputPath);
+
+                posterUrl = fileName;
+            }
+
+            const updateFields = [];
+            const updateValues = [];
+
+            updateFields.push('rating = ?', 'release_date = ?', 'duration = ?');
+            updateValues.push(parsedRating, release_date, parsedDuration);
+
+            if (posterUrl) {
+                updateFields.push('poster_url = ?');
+                updateValues.push(posterUrl);
+            }
+
+            updateValues.push(filmId);
+
+            connection.query(`UPDATE films SET ${updateFields.join(', ')} WHERE id = ?`, updateValues, (err, result) => {
+                if (err) {
+                    return connection.rollback(() => {
+                        if (outputPath) {
+                            fs.unlink(outputPath).catch(unlinkErr => console.error("Error deleting file:", unlinkErr));
+                        }
+                        return res.status(500).json({ success: false, message: "database_error" });
+                    });
+                }
+
+                if (result.affectedRows === 0) {
+                    return connection.rollback(() => {
+                        if (outputPath) {
+                            fs.unlink(outputPath).catch(unlinkErr => console.error("Error deleting file:", unlinkErr));
+                        }
+                        return res.json({ success: false, message: "film_not_found" });
+                    });
+                }
+
+                let operationsCompleted = 0;
+                const totalOperations = (parsedTranslations ? 1 : 0) + (parsedGenres !== null ? 1 : 0);
+
+                if (totalOperations === 0) {
+                    return connection.commit((err) => {
+                        if (err) {
+                            return connection.rollback(() => {
+                                if (outputPath) {
+                                    fs.unlink(outputPath).catch(unlinkErr => console.error("Error deleting file:", unlinkErr));
+                                }
+                                return res.status(500).json({ success: false, message: "commit_error" });
+                            });
+                        }
+                        return res.json({ success: true, message: "film_updated_successfully" });
+                    });
+                }
+
+                const checkCompletion = () => {
+                    operationsCompleted++;
+                    if (operationsCompleted === totalOperations) {
+                        connection.commit((err) => {
+                            if (err) {
+                                return connection.rollback(() => {
+                                    if (outputPath) {
+                                        fs.unlink(outputPath).catch(unlinkErr => console.error("Error deleting file:", unlinkErr));
+                                    }
+                                    return res.status(500).json({ success: false, message: "commit_error" });
+                                });
+                            }
+                            return res.json({ success: true, message: "film_updated_successfully" });
+                        });
+                    }
+                };
+
+                if (parsedTranslations && Array.isArray(parsedTranslations) && parsedTranslations.length > 0) {
+                    connection.query("DELETE FROM film_translations WHERE film_id = ?", [filmId], (err) => {
+                        if (err) {
+                            return connection.rollback(() => {
+                                if (outputPath) {
+                                    fs.unlink(outputPath).catch(unlinkErr => console.error("Error deleting file:", unlinkErr));
+                                }
+                                return res.status(500).json({ success: false, message: "database_error" });
+                            });
+                        }
+
+                        const translationValues = parsedTranslations.map(t => [filmId, t.lang_code, t.title, t.description || '']);
+
+                        connection.query("INSERT INTO film_translations (film_id, language_code, title, description) VALUES ?", [translationValues], (err) => {
+                            if (err) {
+                                return connection.rollback(() => {
+                                    if (outputPath) {
+                                        fs.unlink(outputPath).catch(unlinkErr => console.error("Error deleting file:", unlinkErr));
+                                    }
+                                    return res.status(500).json({ success: false, message: "database_error" });
+                                });
+                            }
+                            checkCompletion();
+                        });
+                    });
+                }
+
+                if (parsedGenres !== null) {
+                    connection.query("DELETE FROM film_genres WHERE film_id = ?", [filmId], (err) => {
+                        if (err) {
+                            return connection.rollback(() => {
+                                if (outputPath) {
+                                    fs.unlink(outputPath).catch(unlinkErr => console.error("Error deleting file:", unlinkErr));
+                                }
+                                return res.status(500).json({ success: false, message: "database_error" });
+                            });
+                        }
+
+                        if (Array.isArray(parsedGenres) && parsedGenres.length > 0) {
+                            const genreValues = parsedGenres.filter(g => g !== null && g !== undefined).map(g => [filmId, g]);
+
+                            if (genreValues.length > 0) {
+                                connection.query("INSERT INTO film_genres (film_id, genre_id) VALUES ?", [genreValues], (err) => {
+                                    if (err) {
+                                        return connection.rollback(() => {
+                                            if (outputPath) {
+                                                fs.unlink(outputPath).catch(unlinkErr => console.error("Error deleting file:", unlinkErr));
+                                            }
+                                            return res.status(500).json({ success: false, message: "database_error" });
+                                        });
+                                    }
+                                    checkCompletion();
+                                });
+                            } else {
+                                checkCompletion();
+                            }
+                        } else {
+                            checkCompletion();
+                        }
+                    });
+                }
+            });
+        } catch (error) {
+            console.error("Error updating film:", error);
+            connection.rollback(() => {
+                return res.status(500).json({ success: false, message: "error_updating_film" });
+            });
+        }
+    });
 })
 
 
