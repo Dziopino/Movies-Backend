@@ -1,7 +1,10 @@
 .env
 node_modules/
-uploads/
 .idea/
 .vscode/
 dist/
 build/
+
+# Ignore user-uploaded avatars but keep film posters
+uploads/*.webp
+!uploads/posters/
