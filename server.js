@@ -41,7 +41,7 @@ app.use(helmet({
 
 const limiter = rateLimit({
     windowMs: 15 * 60 * 1000,
-    max: 500,
+    max: 750,
     standardHeaders: true,
     legacyHeaders: false,
     skipSuccessfulRequests: false,

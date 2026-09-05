@@ -135,7 +135,7 @@ The API implements a **three-tier middleware cascade** that progressively escala
   - **Avatars**: 300×300 cover-fit, WebP quality 80
   - **Film posters**: 200×285 cover-fit, WebP quality 90
 - **Old avatar cleanup**: On successful upload, the previous avatar file is deleted from disk to prevent storage bloat.
-- **Poster storage**: Film posters are saved to `../frontend/public/` for direct serving by the frontend.
+- **Poster storage**: Film posters are saved to `uploads/posters/` and served via express.static middleware at `/uploads` endpoint.
 
 ### Token-Based Password Reset
 - **Generation**: `crypto.randomBytes(32)` produces a 64-character hex token.
@@ -326,7 +326,10 @@ Movies-Backend/
 │   ├── passwordHasher.js       # bcrypt hashing wrapper
 │   └── passwordValidator.js    # Complexity rule engine
 ├── public/                     # Static assets (avatars, uploads)
-├── uploads/                    # Processed WebP avatars
+├── uploads/                    # Processed WebP avatars and film posters
+│   ├── [avatars].webp         # User profile pictures (300×300)
+│   └── posters/               # Film posters (200×285)
+│       └── [posters].webp
 ├── routes/                     # Reserved for future controller extraction
 ├── views/                      # Pug templates (legacy / unused)
 ├── database.js                 # MySQL connection singleton
@@ -363,10 +366,10 @@ Movies-Backend/
 - [ ] **Failed Auth Tracking** — Schema extension to store IP, timestamp, and targeted account for brute-force analysis.
 
 ### Security & Performance
-- [ ] **Rate Limiting** — `express-rate-limit` integration on authentication endpoints to mitigate credential stuffing.
-- [ ] **Helmet.js** — HTTP security headers (CSP, HSTS, X-Frame-Options).
+- [x] **Rate Limiting** — `express-rate-limit` active: 750 req/15min global, 10 req/15min auth endpoints
+- [x] **Helmet.js** — HTTP security headers active (CSP, HSTS, X-Frame-Options)
 - [ ] **Input Sanitization** — `express-validator` schemas for all POST bodies.
-- [ ] **Connection Pooling** — Migrate from single `mysql` connection to `mysql2` pool for concurrent request resilience.
+- [x] **Connection Pooling** — MySQL connection pool implemented in database.js
 
 ---
 
@@ -411,19 +414,25 @@ Create a `.env` file in the project root:
 
 ```env
 PORT=8000
+NODE_ENV=development
 
 # Database
 DB_HOST=localhost
 DB_USER=root
 DB_PASSWORD=your_password
-DB_NAME=your_db_name
+DB_NAME=cinemix
+DB_PORT=3306
 
 # Security
-JWT_SECRET=your_super_secret_jwt_key_min_32_chars
+JWT_SECRET=your_64_byte_hex_secret
 
 # Email (Gmail SMTP)
 MAIL_USER=your_email@gmail.com
 MAIL_PASSWORD=your_app_password
+
+# CORS
+FRONTEND_URL=http://localhost:5173
+CORS_ORIGIN=http://localhost:5173
 ```
 
 > **Important:** Never commit `.env` to version control. The repository's `.gitignore` excludes it by default.
