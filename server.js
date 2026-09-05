@@ -10,7 +10,7 @@ const path = require("path");
 const fs = require("fs").promises;
 const sharp = require("sharp");
 const crypto = require("crypto");
-const nodemailer = require("nodemailer");
+const { Resend } = require('resend');
 const connection = require("./database");
 const isPasswordValid = require("./utils/passwordValidator");
 const hashPassword = require("./utils/passwordHasher");
@@ -86,13 +86,7 @@ const authLimiter = rateLimit({
 app.use('/api/', limiter);
 
 
-const transporter = nodemailer.createTransport({
-    service: "gmail",
-    auth: {
-        user: process.env.MAIL_USER,
-        pass: process.env.MAIL_PASSWORD
-    }
-});
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 connection.getConnection((err, conn) => {
     if (err) {
@@ -667,7 +661,7 @@ app.get("/api/getAllGenresList", authMiddleware, adminMiddleware, (req, res) => 
     });
 });
 
-app.post("/api/requestPasswordReset", (req, res) => {
+app.post("/api/requestPasswordReset", authLimiter, (req, res) => {
     const {email} = req.body;
 
     connection.query("SELECT id FROM users WHERE email = ?", [email], (err, result) => {
@@ -694,19 +688,26 @@ app.post("/api/requestPasswordReset", (req, res) => {
                 console.error('Failed to log PASSWORD_RESET_REQUESTED activity:', logErr);
             }
 
-            transporter.sendMail({
-                from: `"MovieApp Support" <${process.env.MAIL_USER}>`,
-                to: email,
-                subject: "Password reset",
-                html: `
-                    <h2>Password reset</h2>
-                    <p>You requested a password reset.</p>
-                    <a href="${process.env.FRONTEND_URL}/resetPassword/${token}">
-                        Reset password
-                    </a>
-                    <p>This link expires in 15 minutes.</p>
-                `
-            });
+            try {
+                await resend.emails.send({
+                    from: 'Cinemix <noreply@cinemix.xyz>',
+                    to: email,
+                    subject: 'Reset hasła — Cinemix',
+                    html: `
+                        <h2>Reset hasła</h2>
+                        <p>Otrzymaliśmy prośbę o zresetowanie hasła do Twojego konta.</p>
+                        <p>Kliknij poniższy link, aby ustawić nowe hasło:</p>
+                        <a href="${process.env.FRONTEND_URL}/resetPassword/${token}" style="display: inline-block; padding: 10px 20px; background-color: #007bff; color: white; text-decoration: none; border-radius: 5px;">Zresetuj hasło</a>
+                        <p>Link wygasa za 15 minut.</p>
+                        <p>Jeśli nie prosiłeś o reset hasła, zignoruj tę wiadomość.</p>
+                        <hr>
+                        <p style="font-size: 12px; color: #666;">Cinemix - Twoja biblioteka filmów</p>
+                    `
+                });
+                console.log('Password reset email sent successfully to:', email);
+            } catch (mailErr) {
+                console.error('Failed to send password reset email via Resend:', mailErr.message || mailErr);
+            }
 
             return res.json({message:"If this email exists, a reset link has been sent."});
         });

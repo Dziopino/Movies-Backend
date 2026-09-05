@@ -65,7 +65,7 @@ This repository is designed to pair with the [Movies-Frontend](https://github.co
 | **bcrypt** | ^6.0.0 | Secure password hashing (salted) |
 | **multer** | ^2.2.0 | In-memory multipart upload handling |
 | **sharp** | ^0.35.2 | High-performance image processing (WebP compression) |
-| **nodemailer** | ^9.0.3 | SMTP transactional email delivery |
+| **resend** | ^3.x | HTTPS-based transactional email API (replaces SMTP) |
 | **crypto** | ^1.0.1 | Cryptographic token generation (password reset) |
 | **dotenv** | ^17.4.2 | Environment variable management |
 | **cors** | ^2.8.6 | Cross-Origin Resource Sharing policy |
@@ -140,8 +140,9 @@ The API implements a **three-tier middleware cascade** that progressively escala
 ### Token-Based Password Reset
 - **Generation**: `crypto.randomBytes(32)` produces a 64-character hex token.
 - **Expiry**: 15-minute window (`reset_token_expiry`).
-- **Delivery**: nodemailer dispatches a reset link via Gmail SMTP.
+- **Delivery**: Resend API dispatches reset links via HTTPS (port 443) from custom domain `noreply@cinemix.xyz`. Bypasses SMTP port restrictions on cloud platforms like Render.
 - **Invalidation**: Token is nulled immediately after a successful password change.
+- **Error Handling**: Email delivery failures are logged but non-blocking — users receive success response even if email transmission fails, preventing UX degradation.
 
 ---
 
@@ -213,7 +214,7 @@ SUSPENDED ──unsuspend()──► ACTIVE    │
 |--------|----------|------|-------------|
 | `POST` | `/checkLoginData` | — | Authenticate; returns JWT + user object. Handles BANNED / SUSPENDED states with auto-expiry logic. |
 | `POST` | `/addUser` | — | Register new account. Validates password complexity, hashes with bcrypt, rejects duplicate emails. |
-| `POST` | `/requestPasswordReset` | — | Generates crypto token, stores expiry, sends reset email via SMTP. |
+| `POST` | `/requestPasswordReset` | — | Generates crypto token, stores expiry, sends reset email via Resend API (HTTPS). Non-blocking: responds immediately even if email fails. |
 | `GET` | `/getResetToken/:token` | — | Verifies token existence and expiry status. |
 | `POST` | `/resetPassword/:token` | — | Validates token, hashes new password, nullifies token. |
 
@@ -378,7 +379,7 @@ Movies-Backend/
 ### Prerequisites
 - [Node.js](https://nodejs.org/) (LTS recommended)
 - [MySQL](https://www.mysql.com/) server instance
-- SMTP credentials (Gmail recommended for password reset)
+- [Resend](https://resend.com/) API key (free tier: 100 emails/day, 3000/month) with verified domain
 
 ### Installation
 
@@ -392,7 +393,12 @@ npm install
 
 # Configure environment
 cp .env.example .env
-# Edit .env with your database and SMTP credentials (see below)
+# Edit .env with your database and Resend API key (see below)
+
+# Setup Resend domain (production only)
+# 1. Add your domain at https://resend.com/domains
+# 2. Configure DNS records (DKIM, SPF CNAME, DMARC) at your registrar
+# 3. Wait for verification (~10-60 minutes)
 
 # Start the server
 npm start
@@ -425,15 +431,34 @@ DB_PORT=3306
 
 # Security
 JWT_SECRET=your_64_byte_hex_secret
+JWT_EXPIRES_IN=7d
 
-# Email (Gmail SMTP)
-MAIL_USER=your_email@gmail.com
-MAIL_PASSWORD=your_app_password
+# Email (Resend API)
+RESEND_API_KEY=re_xxxxxxxxxxxxxxxxxxxxx
 
-# CORS
+# CORS & Frontend
 FRONTEND_URL=http://localhost:5173
 CORS_ORIGIN=http://localhost:5173
 ```
+
+### Email Configuration Notes
+
+**Local Development:**
+- Resend sandbox mode allows sending to your registered email only
+- Perfect for testing password reset flows
+
+**Production Deployment:**
+- Add and verify your custom domain at [resend.com/domains](https://resend.com/domains)
+- Configure DNS records at your registrar:
+  - `resend._domainkey` TXT (DKIM signature)
+  - `rsend` CNAME → `rsend-euw1.forge.rmta.net` (SPF)
+  - `send` CNAME → `send.forge.rmta.net` (SPF)
+  - `_dmarc` TXT → `v=DMARC1; p=none;`
+- Update `from` address in code to use your domain (e.g., `noreply@yourdomain.com`)
+- Resend free tier: 100 emails/day, 3000/month
+
+**Why Resend instead of SMTP?**
+Cloud platforms (Render, Vercel, Heroku) block outbound SMTP ports (25/587/465) to prevent spam abuse. Resend uses HTTPS API (port 443) which is never blocked, providing reliable email delivery in serverless/container environments.
 
 > **Important:** Never commit `.env` to version control. The repository's `.gitignore` excludes it by default.
 
