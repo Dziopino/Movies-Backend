@@ -1,5 +1,7 @@
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
 const mysql = require('mysql');
 const app = express();
 const bcrypt = require('bcrypt');
@@ -20,8 +22,68 @@ const {loadLanguages, isLanguageValid} = require("./utils/languageValidator");
 const checkIfUserIsAdmin = require("./utils/checkIfUserIsAdmin");
 const logActivity = require("./utils/activityLogger");
 require('dotenv').config();
+
+const corsOptions = {
+    origin: process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',') : 'http://localhost:5173',
+    credentials: true,
+    optionsSuccessStatus: 200
+};
+
+app.use(cors(corsOptions));
+
 app.use(express.json());
-app.use(cors());
+
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+app.use(helmet({
+    crossOriginResourcePolicy: { policy: "cross-origin" }
+}));
+
+const limiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 500,
+    standardHeaders: true,
+    legacyHeaders: false,
+    skipSuccessfulRequests: false,
+    handler: (req, res) => {
+        const retryAfter = Math.ceil((req.rateLimit.resetTime - Date.now()) / 1000);
+        console.log(`[RATE LIMIT] IP: ${req.ip} | Path: ${req.path} | Time: ${new Date().toISOString()} | Retry after: ${retryAfter}s`);
+
+        res.status(429).json({
+            success: false,
+            error_key: 'error.rate_limit_exceeded',
+            message: 'Too many requests',
+            retryAfter: retryAfter > 0 ? retryAfter : 900,
+            limit: req.rateLimit.limit,
+            current: req.rateLimit.current,
+            remaining: req.rateLimit.remaining
+        });
+    }
+});
+
+const authLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 10,
+    standardHeaders: true,
+    legacyHeaders: false,
+    skipSuccessfulRequests: false,
+    handler: (req, res) => {
+        const retryAfter = Math.ceil((req.rateLimit.resetTime - Date.now()) / 1000);
+        console.log(`[AUTH RATE LIMIT] IP: ${req.ip} | Path: ${req.path} | Time: ${new Date().toISOString()} | Retry after: ${retryAfter}s`);
+
+        res.status(429).json({
+            success: false,
+            error_key: 'error.auth_rate_limit_exceeded',
+            message: 'Too many login attempts',
+            retryAfter: retryAfter > 0 ? retryAfter : 900,
+            limit: req.rateLimit.limit,
+            current: req.rateLimit.current,
+            remaining: req.rateLimit.remaining
+        });
+    }
+});
+
+app.use('/api/', limiter);
 
 
 const transporter = nodemailer.createTransport({
@@ -32,14 +94,16 @@ const transporter = nodemailer.createTransport({
     }
 });
 
-connection.connect((err) => {
+connection.getConnection((err, conn) => {
     if (err) {
-        console.log("Error connecting to database. Error: "+err);
-    }else{
+        console.error("Error connecting to database:", err);
+        process.exit(1);
+    } else {
         console.log("Connected to database");
+        conn.release();
         loadLanguages(connection);
     }
-})
+});
 
 const upload = multer({
     storage: multer.memoryStorage(),
@@ -58,7 +122,7 @@ const upload = multer({
 
 
 
-app.post('/checkLoginData', (req, res) => {
+app.post('/api/checkLoginData', authLimiter, (req, res) => {
     const {email, password} = req.body;
     if (!email || !password) {
        return res.json({message: "Invalid email or password"});
@@ -108,7 +172,7 @@ app.post('/checkLoginData', (req, res) => {
     })
 })
 
-app.post('/addUser', async (req, res) => {
+app.post('/api/addUser', authLimiter, async (req, res) => {
     const {username, email, password} = req.body;
 
     if (!username || !email || !password) {
@@ -161,7 +225,7 @@ app.post('/addUser', async (req, res) => {
     }
 })
 
-app.post('/getFilms', optionalAuthMiddleware, (req, res) => {
+app.post('/api/getFilms', optionalAuthMiddleware, (req, res) => {
 
     const userId = req.user?.id || null;
     let language = req.body.language || "en";
@@ -203,7 +267,7 @@ app.post('/getFilms', optionalAuthMiddleware, (req, res) => {
     );
 });
 
-app.post("/likeToggle",authMiddleware, (req, res) => {
+app.post("/api/likeToggle",authMiddleware, (req, res) => {
     const {filmId} = req.body;
     const userId = req.user.id;
 
@@ -246,7 +310,7 @@ app.post("/likeToggle",authMiddleware, (req, res) => {
     })
 })
 
-app.post("/watchedToggle",authMiddleware, (req, res) => {
+app.post("/api/watchedToggle",authMiddleware, (req, res) => {
     const {filmId} = req.body;
     const userId = req.user.id;
 
@@ -288,7 +352,7 @@ app.post("/watchedToggle",authMiddleware, (req, res) => {
         }
     })
 })
-app.post("/likedGet", authMiddleware, (req, res) => {
+app.post("/api/likedGet", authMiddleware, (req, res) => {
 
     const userId = req.user.id;
     const page = Number(req.body.page) || 1;
@@ -319,7 +383,7 @@ app.post("/likedGet", authMiddleware, (req, res) => {
         });
 });
 
-app.post("/watchedGet",authMiddleware, (req, res) => {
+app.post("/api/watchedGet",authMiddleware, (req, res) => {
     const userId = req.user.id;
     const page = Number(req.body.page) || 1;
     const limit = 20;
@@ -349,7 +413,7 @@ app.post("/watchedGet",authMiddleware, (req, res) => {
     });
 })
 
-app.post("/getUserData", authMiddleware, (req, res) => {
+app.post("/api/getUserData", authMiddleware, (req, res) => {
     const userId = req.user.id;
 
     connection.query("SELECT `username`, `avatar_url`, `email`, `created_at`, `role`, `bio`, `language_code` FROM users WHERE users.id = ?",[userId],(err, result) => {
@@ -362,7 +426,7 @@ app.post("/getUserData", authMiddleware, (req, res) => {
     })
 })
 
-app.get("/getLanguageCodes", (req, res) => {
+app.get("/api/getLanguageCodes", (req, res) => {
 
     connection.query("SELECT `code`, `name` FROM `languages`",(err, result) => {
         if (err) {
@@ -374,7 +438,7 @@ app.get("/getLanguageCodes", (req, res) => {
     })
 })
 
-app.post("/editUserBio", authMiddleware, async (req, res) => {
+app.post("/api/editUserBio", authMiddleware, async (req, res) => {
     const userId = req.user.id;
     const {userBio} = req.body;
 
@@ -393,7 +457,7 @@ app.post("/editUserBio", authMiddleware, async (req, res) => {
     })
 })
 
-app.post("/changeUserLanguage", authMiddleware, async (req, res) => {
+app.post("/api/changeUserLanguage", authMiddleware, async (req, res) => {
     const userId = req.user.id;
     const {userLanguageCode} = req.body;
 
@@ -421,7 +485,7 @@ app.post("/changeUserLanguage", authMiddleware, async (req, res) => {
     })
 })
 
-app.post("/editUserName", authMiddleware, async (req, res) => {
+app.post("/api/editUserName", authMiddleware, async (req, res) => {
     const userId = req.user.id;
     const {userName} = req.body;
 
@@ -456,7 +520,7 @@ app.use((err, req, res, next) => {
     next();
 });
 
-app.post("/uploadAvatar", authMiddleware, upload.single("avatar"), async (req, res) => {
+app.post("/api/uploadAvatar", authMiddleware, upload.single("avatar"), async (req, res) => {
 
     const userId = req.user.id;
 
@@ -534,7 +598,13 @@ app.post("/uploadAvatar", authMiddleware, upload.single("avatar"), async (req, r
 });
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
-app.get("/getFilm/:id", optionalAuthMiddleware, (req, res) => {
+// Ensure uploads directories exist
+const uploadsDir = path.join(__dirname, "uploads", "posters");
+fs.mkdir(uploadsDir, { recursive: true }).catch(err => {
+    console.error("Error creating uploads directory:", err);
+});
+
+app.get("/api/getFilm/:id", optionalAuthMiddleware, (req, res) => {
 
     const filmId = req.params.id;
     let languageCode = req.query.language || "en";
@@ -558,7 +628,7 @@ app.get("/getFilm/:id", optionalAuthMiddleware, (req, res) => {
     );
 });
 
-app.get("/getFilmTranslations/:id", authMiddleware, adminMiddleware, (req, res) => {
+app.get("/api/getFilmTranslations/:id", authMiddleware, adminMiddleware, (req, res) => {
     const filmId = req.params.id;
 
     if (!filmId) {
@@ -573,7 +643,7 @@ app.get("/getFilmTranslations/:id", authMiddleware, adminMiddleware, (req, res) 
     });
 });
 
-app.get("/getFilmGenres/:id", authMiddleware, adminMiddleware, (req, res) => {
+app.get("/api/getFilmGenres/:id", authMiddleware, adminMiddleware, (req, res) => {
     const filmId = req.params.id;
 
     if (!filmId) {
@@ -588,7 +658,7 @@ app.get("/getFilmGenres/:id", authMiddleware, adminMiddleware, (req, res) => {
     });
 });
 
-app.get("/getAllGenresList", authMiddleware, adminMiddleware, (req, res) => {
+app.get("/api/getAllGenresList", authMiddleware, adminMiddleware, (req, res) => {
     connection.query("SELECT id, name FROM genres ORDER BY name", (err, result) => {
         if (err) {
             return res.status(500).json({ message: "database_error", success: false });
@@ -597,7 +667,7 @@ app.get("/getAllGenresList", authMiddleware, adminMiddleware, (req, res) => {
     });
 });
 
-app.post("/requestPasswordReset", (req, res) => {
+app.post("/api/requestPasswordReset", (req, res) => {
     const {email} = req.body;
 
     connection.query("SELECT id FROM users WHERE email = ?", [email], (err, result) => {
@@ -625,13 +695,13 @@ app.post("/requestPasswordReset", (req, res) => {
             }
 
             transporter.sendMail({
-                from: `"MovieApp Support" <${process.env.EMAIL_USER}>`,
+                from: `"MovieApp Support" <${process.env.MAIL_USER}>`,
                 to: email,
                 subject: "Password reset",
                 html: `
                     <h2>Password reset</h2>
                     <p>You requested a password reset.</p>
-                    <a href="http://localhost:5173/resetPassword/${token}">
+                    <a href="${process.env.FRONTEND_URL}/resetPassword/${token}">
                         Reset password
                     </a>
                     <p>This link expires in 15 minutes.</p>
@@ -643,7 +713,7 @@ app.post("/requestPasswordReset", (req, res) => {
     });
 });
 
-app.get("/getResetToken/:token", (req, res) => {
+app.get("/api/getResetToken/:token", (req, res) => {
     const token = req.params.token;
 
     if (!token) {
@@ -669,7 +739,7 @@ app.get("/getResetToken/:token", (req, res) => {
     });
 });
 
-app.post("/resetPassword/:token", async (req,res) => {
+app.post("/api/resetPassword/:token", async (req,res) => {
 
     const token = req.params.token;
     const {password} = req.body;
@@ -729,7 +799,7 @@ app.post("/resetPassword/:token", async (req,res) => {
     );
 });
 
-app.get("/getUsers", authMiddleware, adminMiddleware, (req, res) => {
+app.get("/api/getUsers", authMiddleware, adminMiddleware, (req, res) => {
 
     const page = Number(req.query.page) || 1;
     const limit = 25;
@@ -765,7 +835,7 @@ app.get("/getUsers", authMiddleware, adminMiddleware, (req, res) => {
     );
 });
 
-app.get("/refreshUser/:userId", authMiddleware, adminMiddleware, (req, res) => {
+app.get("/api/refreshUser/:userId", authMiddleware, adminMiddleware, (req, res) => {
     const userId = req.params.userId;
     if (!userId) {
         return res.json({message:"no_user_found", success: false});
@@ -783,7 +853,7 @@ app.get("/refreshUser/:userId", authMiddleware, adminMiddleware, (req, res) => {
     })
 })
 
-app.post("/banUser", authMiddleware, adminMiddleware, (req,res) => {
+app.post("/api/banUser", authMiddleware, adminMiddleware, (req,res) => {
     const {userId,userStatus,banReason} = req.body;
 
     const banBy = req.user.id;
@@ -834,7 +904,7 @@ app.post("/banUser", authMiddleware, adminMiddleware, (req,res) => {
     })
 })
 
-app.post("/suspendUser", authMiddleware, adminMiddleware, (req,res) => {
+app.post("/api/suspendUser", authMiddleware, adminMiddleware, (req,res) => {
     const {userId,userStatus,suspendReason,suspendUntil} = req.body;
 
     const suspendBy = req.user.id;
@@ -894,7 +964,7 @@ app.post("/suspendUser", authMiddleware, adminMiddleware, (req,res) => {
     })
 })
 
-app.post("/unBanUser", authMiddleware, adminMiddleware, (req,res) => {
+app.post("/api/unBanUser", authMiddleware, adminMiddleware, (req,res) => {
     const {userId,userStatus} = req.body;
 
     if (!userId) {
@@ -924,7 +994,7 @@ app.post("/unBanUser", authMiddleware, adminMiddleware, (req,res) => {
     })
 })
 
-app.post("/unSuspendUser", authMiddleware, adminMiddleware, (req,res) => {
+app.post("/api/unSuspendUser", authMiddleware, adminMiddleware, (req,res) => {
     const {userId,userStatus} = req.body;
 
     if (!userId) {
@@ -954,7 +1024,7 @@ app.post("/unSuspendUser", authMiddleware, adminMiddleware, (req,res) => {
     })
 })
 
-app.post("/promoteUser", authMiddleware, adminMiddleware, (req,res)=>{
+app.post("/api/promoteUser", authMiddleware, adminMiddleware, (req,res)=>{
 
     const {userId,password} = req.body;
 
@@ -1004,7 +1074,7 @@ app.post("/promoteUser", authMiddleware, adminMiddleware, (req,res)=>{
     );
 });
 
-app.post("/checkSuspensions", authMiddleware, adminMiddleware, (req,res)=>{
+app.post("/api/checkSuspensions", authMiddleware, adminMiddleware, (req,res)=>{
     connection.query(`UPDATE users SET status='ACTIVE', suspended_until=NULL WHERE status='SUSPENDED' AND suspended_until <= NOW()`, (err,result)=>{
             if(err){
                 console.log(err);
@@ -1015,7 +1085,7 @@ app.post("/checkSuspensions", authMiddleware, adminMiddleware, (req,res)=>{
     );
 });
 
-app.get("/getGenres", authMiddleware, adminMiddleware, (req, res) => {
+app.get("/api/getGenres", authMiddleware, adminMiddleware, (req, res) => {
 
     const page = Number(req.query.page) || 1;
     const limit = 20;
@@ -1051,7 +1121,7 @@ app.get("/getGenres", authMiddleware, adminMiddleware, (req, res) => {
     );
 });
 
-app.get("/refreshGenre/:genreId", authMiddleware, adminMiddleware, (req, res) => {
+app.get("/api/refreshGenre/:genreId", authMiddleware, adminMiddleware, (req, res) => {
     const genreId = req.params.genreId;
     if (!genreId) {
         return res.json({message:"no_genre_found", success: false});
@@ -1069,7 +1139,7 @@ app.get("/refreshGenre/:genreId", authMiddleware, adminMiddleware, (req, res) =>
     })
 })
 
-app.post("/deleteGenre", authMiddleware, adminMiddleware, (req,res)=>{
+app.post("/api/deleteGenre", authMiddleware, adminMiddleware, (req,res)=>{
 
     const {genreId,password} = req.body;
 
@@ -1118,7 +1188,7 @@ app.post("/deleteGenre", authMiddleware, adminMiddleware, (req,res)=>{
     );
 });
 
-app.post("/editGenre", authMiddleware, adminMiddleware, async (req,res) => {
+app.post("/api/editGenre", authMiddleware, adminMiddleware, async (req,res) => {
     const genreId = req.body.genreId;
     let newGenreName = req.body.newGenreName;
     const userId = req.user.id;
@@ -1156,7 +1226,7 @@ app.post("/editGenre", authMiddleware, adminMiddleware, async (req,res) => {
     })
 })
 
-app.post("/addGenre", authMiddleware, adminMiddleware, async (req,res) => {
+app.post("/api/addGenre", authMiddleware, adminMiddleware, async (req,res) => {
     let newGenreName = req.body.newGenreName;
     const userId = req.user.id;
 
@@ -1186,7 +1256,7 @@ app.post("/addGenre", authMiddleware, adminMiddleware, async (req,res) => {
     })
 })
 
-app.get("/getFilmsAdmin", authMiddleware, adminMiddleware, (req, res) => {
+app.get("/api/getFilmsAdmin", authMiddleware, adminMiddleware, (req, res) => {
 
     const page = Number(req.query.page) || 1;
     const limit = 20;
@@ -1222,7 +1292,7 @@ app.get("/getFilmsAdmin", authMiddleware, adminMiddleware, (req, res) => {
         });
 });
 
-app.post("/deleteFilm", authMiddleware, adminMiddleware, (req,res)=>{
+app.post("/api/deleteFilm", authMiddleware, adminMiddleware, (req,res)=>{
 
     const {filmId,password} = req.body;
 
@@ -1271,7 +1341,7 @@ app.post("/deleteFilm", authMiddleware, adminMiddleware, (req,res)=>{
     );
 });
 
-app.post("/addFilm", authMiddleware, adminMiddleware, upload.single('poster'), async (req, res) => {
+app.post("/api/addFilm", authMiddleware, adminMiddleware, upload.single('poster'), async (req, res) => {
     const { rating, release_date, duration, translations, genres } = req.body;
     const userId = req.user.id;
 
@@ -1322,7 +1392,7 @@ app.post("/addFilm", authMiddleware, adminMiddleware, upload.single('poster'), a
     try {
         const timestamp = Date.now();
         const fileName = `poster_${timestamp}.webp`;
-        const outputPath = path.join(__dirname, '../frontend/public', fileName);
+        const outputPath = path.join(__dirname, "uploads", "posters", fileName);
 
         await sharp(req.file.buffer)
             .resize(200, 285, {
@@ -1332,7 +1402,7 @@ app.post("/addFilm", authMiddleware, adminMiddleware, upload.single('poster'), a
             .webp({ quality: 90 })
             .toFile(outputPath);
 
-        const posterUrl = fileName;
+        const posterUrl = `/uploads/posters/${fileName}`;
 
         connection.query("INSERT INTO films (poster_url, rating, release_date, duration) VALUES (?, ?, ?, ?)", [posterUrl, parsedRating, release_date, parsedDuration], (err, result) => {
             if (err) {
@@ -1409,7 +1479,7 @@ app.post("/addFilm", authMiddleware, adminMiddleware, upload.single('poster'), a
     }
 });
 
-app.post('/addAdmin',authMiddleware, adminMiddleware, async (req, res) => {
+app.post('/api/addAdmin',authMiddleware, adminMiddleware, async (req, res) => {
     const {username, email, password} = req.body;
 
     if (!username || !email || !password) {
@@ -1441,7 +1511,7 @@ app.post('/addAdmin',authMiddleware, adminMiddleware, async (req, res) => {
     }
 })
 
-app.put("/updateFilm/:id", authMiddleware, adminMiddleware, upload.single('poster'), async (req, res) => {
+app.put("/api/updateFilm/:id", authMiddleware, adminMiddleware, upload.single('poster'), async (req, res) => {
     const filmId = req.params.id;
     const { rating, release_date, duration, translations, genres } = req.body;
     const userId = req.user.id;
@@ -1494,97 +1564,87 @@ app.put("/updateFilm/:id", authMiddleware, adminMiddleware, upload.single('poste
         }
     }
 
-    connection.beginTransaction(async (err) => {
-        if (err) {
-            return res.status(500).json({ success: false, message: "transaction_start_error" });
+
+    connection.getConnection((connErr, conn) => {
+        if (connErr) {
+            return res.status(500).json({ success: false, message: "connection_error" });
         }
 
-        try {
-            let posterUrl = null;
-            let outputPath = null;
-
-            if (req.file) {
-                const timestamp = Date.now();
-                const fileName = `poster_${timestamp}.webp`;
-                outputPath = path.join(__dirname, '../frontend/public', fileName);
-
-                await sharp(req.file.buffer)
-                    .resize(200, 285, {
-                        fit: 'cover',
-                        position: 'center'
-                    })
-                    .webp({ quality: 90 })
-                    .toFile(outputPath);
-
-                posterUrl = fileName;
+        conn.beginTransaction(async (err) => {
+            if (err) {
+                conn.release();
+                return res.status(500).json({ success: false, message: "transaction_start_error" });
             }
 
-            const updateFields = [];
-            const updateValues = [];
+            try {
+                let posterUrl = null;
+                let outputPath = null;
 
-            updateFields.push('rating = ?', 'release_date = ?', 'duration = ?');
-            updateValues.push(parsedRating, release_date, parsedDuration);
+                if (req.file) {
+                    const timestamp = Date.now();
+                    const fileName = `poster_${timestamp}.webp`;
+                    outputPath = path.join(__dirname, "uploads", "posters", fileName);
 
-            if (posterUrl) {
-                updateFields.push('poster_url = ?');
-                updateValues.push(posterUrl);
-            }
+                    await sharp(req.file.buffer)
+                        .resize(200, 285, {
+                            fit: 'cover',
+                            position: 'center'
+                        })
+                        .webp({ quality: 90 })
+                        .toFile(outputPath);
 
-            updateValues.push(filmId);
-
-            connection.query(`UPDATE films SET ${updateFields.join(', ')} WHERE id = ?`, updateValues, (err, result) => {
-                if (err) {
-                    return connection.rollback(() => {
-                        if (outputPath) {
-                            fs.unlink(outputPath).catch(unlinkErr => console.error("Error deleting file:", unlinkErr));
-                        }
-                        return res.status(500).json({ success: false, message: "database_error" });
-                    });
+                    posterUrl = `/uploads/posters/${fileName}`;
                 }
 
-                if (result.affectedRows === 0) {
-                    return connection.rollback(() => {
-                        if (outputPath) {
-                            fs.unlink(outputPath).catch(unlinkErr => console.error("Error deleting file:", unlinkErr));
-                        }
-                        return res.json({ success: false, message: "film_not_found" });
-                    });
+                const updateFields = [];
+                const updateValues = [];
+
+                updateFields.push('rating = ?', 'release_date = ?', 'duration = ?');
+                updateValues.push(parsedRating, release_date, parsedDuration);
+
+                if (posterUrl) {
+                    updateFields.push('poster_url = ?');
+                    updateValues.push(posterUrl);
                 }
 
-                let operationsCompleted = 0;
-                const totalOperations = (parsedTranslations ? 1 : 0) + (parsedGenres !== null ? 1 : 0);
+                updateValues.push(filmId);
 
-                if (totalOperations === 0) {
-                    return connection.commit(async (err) => {
-                        if (err) {
-                            return connection.rollback(() => {
-                                if (outputPath) {
-                                    fs.unlink(outputPath).catch(unlinkErr => console.error("Error deleting file:", unlinkErr));
-                                }
-                                return res.status(500).json({ success: false, message: "commit_error" });
-                            });
-                        }
-                        try {
-                            await logActivity(userId, 'FILM_UPDATED');
-                        } catch (logErr) {
-                            console.error('Failed to log FILM_UPDATED activity:', logErr);
-                        }
-                        return res.json({ success: true, message: "film_updated_successfully" });
-                    });
-                }
+                conn.query(`UPDATE films SET ${updateFields.join(', ')} WHERE id = ?`, updateValues, (err, result) => {
+                    if (err) {
+                        return conn.rollback(() => {
+                            conn.release();
+                            if (outputPath) {
+                                fs.unlink(outputPath).catch(unlinkErr => console.error("Error deleting file:", unlinkErr));
+                            }
+                            return res.status(500).json({ success: false, message: "database_error" });
+                        });
+                    }
 
-                const checkCompletion = () => {
-                    operationsCompleted++;
-                    if (operationsCompleted === totalOperations) {
-                        connection.commit(async (err) => {
+                    if (result.affectedRows === 0) {
+                        return conn.rollback(() => {
+                            conn.release();
+                            if (outputPath) {
+                                fs.unlink(outputPath).catch(unlinkErr => console.error("Error deleting file:", unlinkErr));
+                            }
+                            return res.json({ success: false, message: "film_not_found" });
+                        });
+                    }
+
+                    let operationsCompleted = 0;
+                    const totalOperations = (parsedTranslations ? 1 : 0) + (parsedGenres !== null ? 1 : 0);
+
+                    if (totalOperations === 0) {
+                        return conn.commit(async (err) => {
                             if (err) {
-                                return connection.rollback(() => {
+                                return conn.rollback(() => {
+                                    conn.release();
                                     if (outputPath) {
                                         fs.unlink(outputPath).catch(unlinkErr => console.error("Error deleting file:", unlinkErr));
                                     }
                                     return res.status(500).json({ success: false, message: "commit_error" });
                                 });
                             }
+                            conn.release();
                             try {
                                 await logActivity(userId, 'FILM_UPDATED');
                             } catch (logErr) {
@@ -1593,12 +1653,36 @@ app.put("/updateFilm/:id", authMiddleware, adminMiddleware, upload.single('poste
                             return res.json({ success: true, message: "film_updated_successfully" });
                         });
                     }
+
+                    const checkCompletion = () => {
+                        operationsCompleted++;
+                        if (operationsCompleted === totalOperations) {
+                            conn.commit(async (err) => {
+                                if (err) {
+                                    return conn.rollback(() => {
+                                        conn.release();
+                                        if (outputPath) {
+                                            fs.unlink(outputPath).catch(unlinkErr => console.error("Error deleting file:", unlinkErr));
+                                        }
+                                        return res.status(500).json({ success: false, message: "commit_error" });
+                                    });
+                                }
+                                conn.release();
+                                try {
+                                    await logActivity(userId, 'FILM_UPDATED');
+                                } catch (logErr) {
+                                    console.error('Failed to log FILM_UPDATED activity:', logErr);
+                                }
+                                return res.json({ success: true, message: "film_updated_successfully" });
+                        });
+                    }
                 };
 
                 if (parsedTranslations && Array.isArray(parsedTranslations) && parsedTranslations.length > 0) {
-                    connection.query("DELETE FROM film_translations WHERE film_id = ?", [filmId], (err) => {
+                    conn.query("DELETE FROM film_translations WHERE film_id = ?", [filmId], (err) => {
                         if (err) {
-                            return connection.rollback(() => {
+                            return conn.rollback(() => {
+                                conn.release();
                                 if (outputPath) {
                                     fs.unlink(outputPath).catch(unlinkErr => console.error("Error deleting file:", unlinkErr));
                                 }
@@ -1608,9 +1692,10 @@ app.put("/updateFilm/:id", authMiddleware, adminMiddleware, upload.single('poste
 
                         const translationValues = parsedTranslations.map(t => [filmId, t.lang_code, t.title, t.description || '']);
 
-                        connection.query("INSERT INTO film_translations (film_id, language_code, title, description) VALUES ?", [translationValues], (err) => {
+                        conn.query("INSERT INTO film_translations (film_id, language_code, title, description) VALUES ?", [translationValues], (err) => {
                             if (err) {
-                                return connection.rollback(() => {
+                                return conn.rollback(() => {
+                                    conn.release();
                                     if (outputPath) {
                                         fs.unlink(outputPath).catch(unlinkErr => console.error("Error deleting file:", unlinkErr));
                                     }
@@ -1623,9 +1708,10 @@ app.put("/updateFilm/:id", authMiddleware, adminMiddleware, upload.single('poste
                 }
 
                 if (parsedGenres !== null) {
-                    connection.query("DELETE FROM film_genres WHERE film_id = ?", [filmId], (err) => {
+                    conn.query("DELETE FROM film_genres WHERE film_id = ?", [filmId], (err) => {
                         if (err) {
-                            return connection.rollback(() => {
+                            return conn.rollback(() => {
+                                conn.release();
                                 if (outputPath) {
                                     fs.unlink(outputPath).catch(unlinkErr => console.error("Error deleting file:", unlinkErr));
                                 }
@@ -1637,9 +1723,10 @@ app.put("/updateFilm/:id", authMiddleware, adminMiddleware, upload.single('poste
                             const genreValues = parsedGenres.filter(g => g !== null && g !== undefined).map(g => [filmId, g]);
 
                             if (genreValues.length > 0) {
-                                connection.query("INSERT INTO film_genres (film_id, genre_id) VALUES ?", [genreValues], (err) => {
+                                conn.query("INSERT INTO film_genres (film_id, genre_id) VALUES ?", [genreValues], (err) => {
                                     if (err) {
-                                        return connection.rollback(() => {
+                                        return conn.rollback(() => {
+                                            conn.release();
                                             if (outputPath) {
                                                 fs.unlink(outputPath).catch(unlinkErr => console.error("Error deleting file:", unlinkErr));
                                             }
@@ -1659,10 +1746,12 @@ app.put("/updateFilm/:id", authMiddleware, adminMiddleware, upload.single('poste
             });
         } catch (error) {
             console.error("Error updating film:", error);
-            connection.rollback(() => {
+            conn.rollback(() => {
+                conn.release();
                 return res.status(500).json({ success: false, message: "error_updating_film" });
             });
         }
+    });
     });
 })
 
@@ -1822,22 +1911,7 @@ app.get("/api/admin/dashboard/audit-logs", authMiddleware, adminMiddleware, (req
 app.get("/api/admin/dashboard/films-analytics", authMiddleware, adminMiddleware, (req, res) => {
     const queries = {
         topPopularFilms: new Promise((resolve, reject) => {
-            connection.query(`
-                SELECT
-                    f.id,
-                    COALESCE(ft.title, 'Untitled') as title,
-                    COUNT(DISTINCT uf.user_id) as likes_count,
-                    COUNT(DISTINCT uw.user_id) as watched_count,
-                    (COUNT(DISTINCT uf.user_id) + COUNT(DISTINCT uw.user_id)) as popularity_score
-                FROM films f
-                LEFT JOIN film_translations ft ON f.id = ft.film_id AND ft.language_code = 'en'
-                LEFT JOIN user_favorites uf ON f.id = uf.film_id
-                LEFT JOIN user_watched uw ON f.id = uw.film_id
-                GROUP BY f.id
-                HAVING popularity_score > 0
-                ORDER BY popularity_score DESC
-                LIMIT 10
-            `, (err, result) => {
+            connection.query(`SELECT f.id, COALESCE(ft.title, 'Untitled') as title, COUNT(DISTINCT uf.user_id) as likes_count, COUNT(DISTINCT uw.user_id) as watched_count, (COUNT(DISTINCT uf.user_id) + COUNT(DISTINCT uw.user_id)) as popularity_score FROM films f LEFT JOIN film_translations ft ON f.id = ft.film_id AND ft.language_code = 'en' LEFT JOIN user_favorites uf ON f.id = uf.film_id LEFT JOIN user_watched uw ON f.id = uw.film_id GROUP BY f.id HAVING popularity_score > 0 ORDER BY popularity_score DESC LIMIT 10`, (err, result) => {
                     if (err) reject(err);
                     else resolve(result);
                 }

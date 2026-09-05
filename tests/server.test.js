@@ -8,12 +8,12 @@ const app = (await import('../server.js')).default;
 
 describe('Server Endpoints - Integration Tests', () => {
 
-    describe('GET /getLanguageCodes', () => {
+    describe('GET /api/getLanguageCodes', () => {
 
         it('should return list of available language codes', async () => {
 
             const response = await request(app)
-                .get('/getLanguageCodes');
+                .get('/api/getLanguageCodes');
 
             expect(response.status).toBe(200);
             expect(response.body.message).toContain('Language codes got successfully');
@@ -27,12 +27,12 @@ describe('Server Endpoints - Integration Tests', () => {
         });
     });
 
-    describe('POST /addUser', () => {
+    describe('POST /api/addUser', () => {
 
         it('should reject registration with invalid password', async () => {
 
             const response = await request(app)
-                .post('/addUser')
+                .post('/api/addUser')
                 .send({
                     username: 'testuser',
                     email: 'test@example.com',
@@ -47,7 +47,7 @@ describe('Server Endpoints - Integration Tests', () => {
         it('should reject registration with missing fields', async () => {
 
             const response = await request(app)
-                .post('/addUser')
+                .post('/api/addUser')
                 .send({
                     username: 'testuser'
                     // Brak email i password
@@ -61,7 +61,7 @@ describe('Server Endpoints - Integration Tests', () => {
         it('should reject registration with missing password', async () => {
 
             const response = await request(app)
-                .post('/addUser')
+                .post('/api/addUser')
                 .send({
                     username: 'testuser',
                     email: 'test@example.com'
@@ -74,13 +74,13 @@ describe('Server Endpoints - Integration Tests', () => {
         });
     });
 
-    describe('GET /getFilm/:id', () => {
+    describe('GET /api/getFilm/:id', () => {
 
         it('should return film details for existing film', async () => {
 
             // Testujemy z filmem ID 5 (zakładamy, że istnieje w bazie)
             const response = await request(app)
-                .get('/getFilm/5')
+                .get('/api/getFilm/5')
                 .query({ language: 'en' });
 
             expect(response.status).toBe(200);
@@ -100,7 +100,7 @@ describe('Server Endpoints - Integration Tests', () => {
 
             // Ten endpoint powinien działać bez tokena (optional auth)
             const response = await request(app)
-                .get('/getFilm/5')
+                .get('/api/getFilm/5')
                 .query({ language: 'en' });
 
             expect(response.status).toBe(200);
@@ -110,7 +110,7 @@ describe('Server Endpoints - Integration Tests', () => {
         it('should use default language for invalid language code', async () => {
 
             const response = await request(app)
-                .get('/getFilm/5')
+                .get('/api/getFilm/5')
                 .query({ language: 'invalid_xyz' });
 
             // Powinno zwrócić film z domyślnym językiem (en)
@@ -119,12 +119,12 @@ describe('Server Endpoints - Integration Tests', () => {
         });
     });
 
-    describe('POST /getFilms', () => {
+    describe('POST /api/getFilms', () => {
 
         it('should return list of films without authentication', async () => {
 
             const response = await request(app)
-                .post('/getFilms')
+                .post('/api/getFilms')
                 .send({
                     language: 'en',
                     page: 1
@@ -139,7 +139,7 @@ describe('Server Endpoints - Integration Tests', () => {
         it('should support pagination', async () => {
 
             const response = await request(app)
-                .post('/getFilms')
+                .post('/api/getFilms')
                 .send({
                     language: 'en',
                     page: 2
@@ -153,7 +153,7 @@ describe('Server Endpoints - Integration Tests', () => {
         it('should use default language when not specified', async () => {
 
             const response = await request(app)
-                .post('/getFilms')
+                .post('/api/getFilms')
                 .send({
                     page: 1
                 });
@@ -165,10 +165,10 @@ describe('Server Endpoints - Integration Tests', () => {
 
     describe('Server health', () => {
 
-        it('should respond to GET /getLanguageCodes without crashing', async () => {
+        it('should respond to GET /api/getLanguageCodes without crashing', async () => {
 
             const response = await request(app)
-                .get('/getLanguageCodes');
+                .get('/api/getLanguageCodes');
 
             expect(response.status).toBe(200);
         });

@@ -1,31 +1,12 @@
--- phpMyAdmin SQL Dump
--- version 5.2.1
--- https://www.phpmyadmin.net/
---
--- Host: 127.0.0.1
--- Generation Time: Aug 18, 2026 at 10:04 PM
--- Wersja serwera: 10.4.32-MariaDB
--- Wersja PHP: 8.2.12
-
 SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
 START TRANSACTION;
 SET time_zone = "+00:00";
-
 
 /*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
 /*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
 /*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
 /*!40101 SET NAMES utf8mb4 */;
 
---
--- Database: `cinemix`
---
-
--- --------------------------------------------------------
-
---
--- Struktura tabeli dla tabeli `films`
---
 
 CREATE TABLE `films` (
   `id` int(11) NOT NULL,
@@ -35,56 +16,42 @@ CREATE TABLE `films` (
   `duration` int(11) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
---
--- Dumping data for table `films`
---
-
 INSERT INTO `films` (`id`, `poster_url`, `rating`, `release_date`, `duration`) VALUES
-(1, 'obsession.webp', 7.8, '2025-09-06', 108),
-(2, 'starWarsTheMandalorianAndGrogu.webp', 6.5, '2026-05-20', 132),
-(3, 'ladiesFirst.webp', 5.7, '2026-05-22', 93),
-(4, 'fjord.webp', 7.8, '2026-05-18', 146),
-(5, 'altarBoys.webp', 7.0, '2025-11-21', 110),
-(6, 'drama.webp', 7.1, '2026-04-01', 105),
-(7, 'theHailMaryProject.webp', 7.9, '2026-03-14', 156),
-(8, 'theSilentFriend.webp', 7.2, '2025-07-05', 145),
-(9, 'alpha.webp', 5.7, '2026-04-24', 95),
-(10, 'tomClancyJackRyanGhostWar.webp', 5.3, '2026-05-20', 105),
-(11, 'mortalKombat2.webp', 6.5, '2026-05-06', 116),
-(12, 'wutheringHeights.webp', 5.9, '2026-02-13', 136),
-(13, 'bride.webp', 5.3, '2026-03-04', 126),
-(14, 'homeland.webp', 7.0, '2026-05-14', 82),
-(15, 'theGoodBoy.webp', 7.3, '2025-09-05', 110),
-(16, 'odyssey.webp', 7.5, '2026-07-06', 172),
-(17, 'mastersOfTheUniverse.webp', 6.4, '2026-07-03', 141),
-(18, 'invitation.webp', 7.4, '2026-01-24', 108),
-(19, 'backroomsNoWayOut.webp', 6.4, '2026-05-07', 105),
-(20, 'scaryMovie.webp', 4.9, '2026-06-03', 95),
-(21, 'dayOfRevelation.webp', 5.8, '2026-06-10', 145),
-(22, 'theSheepDetectives.webp', 7.1, '2026-05-02', 109),
-(23, 'hokum.webp', 5.9, '2026-03-14', 107),
-(24, 'interstellar.webp', 8.0, '2026-10-05', 169),
-(25, 'evilDeadBurn.webp', 6.2, '2026-07-08', 110),
-(26, 'troy.webp', 7.4, '2026-05-14', 163),
-(27, 'leCoseNonDette.webp', 7.1, '2026-01-29', 114),
-(28, 'toyStory5.webp', 7.6, '2026-05-28', 102),
-(29, 'theMummy.webp', 5.5, '2026-04-17', 133),
-(30, 'oppenheimer.webp', 7.9, '2023-07-21', 180);
-
--- --------------------------------------------------------
-
---
--- Struktura tabeli dla tabeli `film_genres`
---
+(1, '/uploads/posters/obsession.webp', 7.8, '2025-09-06', 108),
+(2, '/uploads/posters/starWarsTheMandalorianAndGrogu.webp', 6.5, '2026-05-20', 132),
+(3, '/uploads/posters/ladiesFirst.webp', 5.7, '2026-05-22', 93),
+(4, '/uploads/posters/fjord.webp', 7.8, '2026-05-18', 146),
+(5, '/uploads/posters/altarBoys.webp', 7.0, '2025-11-21', 110),
+(6, '/uploads/posters/drama.webp', 7.1, '2026-04-01', 105),
+(7, '/uploads/posters/theHailMaryProject.webp', 7.9, '2026-03-13', 156),
+(8, '/uploads/posters/theSilentFriend.webp', 7.2, '2025-07-05', 145),
+(9, '/uploads/posters/alpha.webp', 5.7, '2026-04-24', 95),
+(10, '/uploads/posters/tomClancyJackRyanGhostWar.webp', 5.3, '2026-05-20', 105),
+(11, '/uploads/posters/mortalKombat2.webp', 6.5, '2026-05-06', 116),
+(12, '/uploads/posters/wutheringHeights.webp', 5.9, '2026-02-13', 136),
+(13, '/uploads/posters/bride.webp', 5.3, '2026-03-04', 126),
+(14, '/uploads/posters/homeland.webp', 7.0, '2026-05-14', 82),
+(15, '/uploads/posters/theGoodBoy.webp', 7.3, '2025-09-05', 110),
+(16, '/uploads/posters/odyssey.webp', 7.5, '2026-07-06', 172),
+(17, '/uploads/posters/mastersOfTheUniverse.webp', 6.4, '2026-07-03', 141),
+(18, '/uploads/posters/invitation.webp', 7.4, '2026-01-24', 108),
+(19, '/uploads/posters/backroomsNoWayOut.webp', 6.4, '2026-05-07', 105),
+(20, '/uploads/posters/scaryMovie.webp', 4.9, '2026-06-03', 95),
+(21, '/uploads/posters/dayOfRevelation.webp', 5.8, '2026-06-10', 145),
+(22, '/uploads/posters/theSheepDetectives.webp', 7.1, '2026-05-02', 109),
+(23, '/uploads/posters/hokum.webp', 5.9, '2026-03-14', 107),
+(24, '/uploads/posters/interstellar.webp', 8.0, '2026-10-05', 169),
+(25, '/uploads/posters/evilDeadBurn.webp', 6.2, '2026-07-08', 110),
+(26, '/uploads/posters/troy.webp', 7.4, '2026-05-14', 163),
+(27, '/uploads/posters/leCoseNonDette.webp', 7.1, '2026-01-28', 114),
+(28, '/uploads/posters/toyStory5.webp', 7.6, '2026-05-28', 102),
+(29, '/uploads/posters/theMummy.webp', 5.5, '2026-04-17', 133),
+(30, '/uploads/posters/oppenheimer.webp', 7.9, '2023-07-20', 180);
 
 CREATE TABLE `film_genres` (
   `film_id` int(11) NOT NULL,
   `genre_id` int(11) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
---
--- Dumping data for table `film_genres`
---
 
 INSERT INTO `film_genres` (`film_id`, `genre_id`) VALUES
 (1, 1),
@@ -131,12 +98,6 @@ INSERT INTO `film_genres` (`film_id`, `genre_id`) VALUES
 (30, 2),
 (30, 19);
 
--- --------------------------------------------------------
-
---
--- Struktura tabeli dla tabeli `film_translations`
---
-
 CREATE TABLE `film_translations` (
   `id` int(11) NOT NULL,
   `film_id` int(11) NOT NULL,
@@ -145,10 +106,6 @@ CREATE TABLE `film_translations` (
   `description` text DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
---
--- Dumping data for table `film_translations`
---
-
 INSERT INTO `film_translations` (`id`, `film_id`, `language_code`, `title`, `description`) VALUES
 (1, 1, 'en', 'Obsession', 'Bear ( Michael Johnston ), platonically in love with his friend Nikki ( Inde Navarrette ), wants to win her heart and decides to fulfill his dream with a cheap wish-granting toy called \"One Wish Willow.\" The toy actually works, and he gets exactly what he asked for, but he soon discovers that some desires come with a dark, sinister price.'),
 (2, 2, 'en', 'Star Wars: The Mandalorian and Grogu', 'The sinister Empire has fallen, and Imperial warlords remain scattered across the galaxy. The fledgling New Republic, striving to protect everything the Rebellion has fought for, turns to the legendary Mandalorian bounty hunter Din Djarin and his young apprentice, Grogu , for aid .'),
@@ -156,7 +113,6 @@ INSERT INTO `film_translations` (`id`, `film_id`, `language_code`, `title`, `des
 (4, 4, 'en', 'Fjord', 'The Gheorghiu family, whose father is from Romania and whose mother is from Norway, moves to the woman\'s hometown, a small and isolated Norwegian village. There, they develop a close friendship with the neighboring Halberg family. However\r\n, the situation changes when questions arise about the treatment of the children. From that moment on, the Gheorghiu family\'s lives are completely disrupted. They suddenly find themselves the center of attention from the authorities and under increasingly intense, oppressive scrutiny.'),
 (5, 5, 'en', 'Altar boys', 'A group of teenage altar boys, frustrated by the indifference of adults and Church institutions toward social injustice, decide to implement their own, unconventional plan for moral renewal. Armed with youthful rebellion and their own interpretation of Scripture, they bug a confessional to better understand their neighbors. Masked like Zorro and with ambitions worthy of Robin Hood, they become judges in their neighborhood, helping those in need and meting out punishment for sins. However, their mission turns into a dangerous game, and the boys, applying their own idealistic code of honor, begin to walk the fine line between good and evil. Real life in the housing estate blends with a mission straight out of superhero comics, but instead of capes, the heroes wear surplices.'),
 (6, 6, 'en', 'The Drama', 'Beautiful, wealthy, and in love. Their upcoming wedding will be merely the icing on the cake. Unless, of course, it doesn\'t happen at all. A few days before the ceremony, shocking information about the bride-to-be\'s past is revealed, casting her in a very dark light. Will the groom-to-be find enough love, understanding, and empathy to understand and forgive? Or perhaps there\'s nothing to forgive? Perhaps it\'s enough to accept that the person you want to spend the rest of your life with is simply someone completely different from what you imagined? If you think about it, it might even be fun. Unless, of course, it turns out to be dangerous.'),
-(7, 7, 'en', 'Project Hail Mary', 'Science teacher Ryland Grace ( Ryan Gosling ) wakes up on a spaceship light-years from home with no memory of who he is or how he got there. As his memory returns, he begins to unravel his mission: to solve the mystery of a mysterious substance causing the sun to fade. He must use his scientific knowledge and unconventional ideas to save everything on Earth from destruction, but an unexpected friendship means he may not have to do it alone.'),
 (8, 8, 'en', 'Stille Freundin', 'In the heart of the university\'s botanical garden, a magnificent ginkgo biloba tree grows. Over the course of a century, it becomes a silent witness and participant in the story of three strangers. A determined girl fights for a place in the botany department, seeking refuge from the prejudices of the male-dominated academic world in the tree\'s shade. A lonely student, who has never paid much attention to plants, finds solace in its silent presence after a life of turmoil. A Hong Kong neurologist (played by Tony Leung , known from Wong Kar-Wai\'s films ) begins to question his scientific beliefs after an encounter with the tree, discovering a profound connection between the visible and the intangible.'),
 (9, 9, 'en', 'Apex', 'A grieving woman testing her limits in the Australian wilderness is unexpectedly drawn into a deadly game with a ruthless adversary.'),
 (10, 10, 'en', 'Jack Ryan: Ghost War', 'In the new film, Jack Ryan reluctantly returns to the world of espionage when an international covert mission uncovers a deadly conspiracy, forcing him to confront a relentless special operations unit under immense time pressure. Operating in real time, with lives at stake and the threat mounting with every passing moment, Jack reunites with veteran CIA operative Mike November ( Michael Kelly ) and former CIA director James Greer ( Wendell Pierce ). Their combined experience is their only advantage against an enemy who knows their every move. Aided by an unlikely new partner—the astute MI6 agent Emma Marlowe ( Sienna Miller )—Jack and his team navigate a treacherous web of intrigue, confronting pasts they long thought closed. This is their most personal and risky mission yet.'),
@@ -171,7 +127,6 @@ INSERT INTO `film_translations` (`id`, `film_id`, `language_code`, `title`, `des
 (19, 4, 'pl', 'Fjord', 'Rodzina Gheorghiu, w której ojciec pochodzi z Rumunii, a matka z Norwegii, przeprowadza się do rodzinnej miejscowości kobiety, niewielkiej i odizolowanej norweskiej wioski. Tam nawiązują bliską przyjacielską relację z sąsiadującą rodziną Halbergów.\r\nSytuacja zmienia się, gdy pojawiają się wątpliwości dotyczące sposobu, w jaki traktowane są dzieci. Od tego momentu życie rodziny Gheorghiu zostaje całkowicie zaburzone. Niespodziewanie znajdują się w centrum zainteresowania władz i pod coraz silniejszą, przytłaczającą kontrolą.'),
 (20, 5, 'pl', 'Ministranci', 'Grupa nastoletnich ministrantów, sfrustrowana obojętną postawą dorosłych i instytucji Kościoła wobec niesprawiedliwości społecznej, postanawia wdrożyć własny, nietypowy plan odnowy moralnej. Uzbrojeni w młodzieńczy bunt i własną interpretację Pisma Świętego zakładają podsłuch… w konfesjonale, aby lepiej poznać swoich sąsiadów. Zamaskowani niczym Zorro i z ambicjami na miarę Robin Hooda, stają się sędziami w swoim osiedlowym świecie, pomagając potrzebującym i wymierzając kary za grzechy. Jednak ich misja zamienia się w niebezpieczną grę, a chłopcy, stosując własny, idealistyczny kodeks honorowy, zaczynają balansować na cienkiej granicy między dobrem a złem. Prawdziwe życie blokowiska miesza się z misją wprost z komiksów o superbohaterach, ale zamiast peleryn, bohaterowie noszą komże.'),
 (21, 6, 'pl', 'Drama', 'Piękni, zamożni i zakochani. Ich zbliżający się ślub będzie jedynie postawieniem kropki nad \"i\". No chyba, że do niego wcale nie dojdzie. Na kilka dni przed ceremonią, na jaw wychodzi szokująca informacja o przeszłości przyszłej panny młodej, która stawia ją w bardzo mrocznym świetle. Czy przyszły pan młody znajdzie w sobie tyle miłości, wyrozumiałości i empatii, by zrozumieć i wybaczyć? A może tu nie ma nic do wybaczania? Może wystarczy zaakceptować fakt, że osoba, z którą chce się spędzić resztę życia jest po prostu kimś zupełnie innym niż nam się wydawało? Gdyby się nad tym spokojnie zastanowić, to może być nawet zabawne. Chyba, że okaże się niebezpieczne.'),
-(22, 7, 'pl', 'Projekt Hail Mary', 'Nauczyciel nauk ścisłych Ryland Grace (Ryan Gosling) budzi się na statku kosmicznym lata świetlne od domu, nie pamiętając, kim jest ani jak się tam znalazł. Gdy wraca mu pamięć, zaczyna odkrywać swoją misję: rozwiązać zagadkę tajemniczej substancji powodującej wygaśnięcie słońca. Musi wykorzystać swoją wiedzę naukową i niekonwencjonalne pomysły, aby ocalić wszystko na Ziemi przed zagładą, ale nieoczekiwana przyjaźń oznacza, że być może nie będzie musiał robić tego sam.'),
 (23, 8, 'pl', 'Milcząca przyjaciółka', 'W sercu uniwersyteckiego ogrodu botanicznego rośnie okazały miłorząb japoński (gingko biloba), który na przestrzeni wieku staje się niemym świadkiem i uczestnikiem historii trojga nieznajomych. Zdeterminowana dziewczyna walczy o miejsce na wydziale botaniki, szukając w cieniu drzewa schronienia przed uprzedzeniami zdominowanego przez mężczyzn świata nauki. Samotny student, który nigdy nie zwracał uwagi na rośliny, w jego milczącej obecności odnajduje punkt oparcia po życiowym zawirowaniu. Neurolog z Hong-Kongu (w tej roli znany z filmów Wonga Kar-Waia Tony Leung) pod wpływem kontaktu z drzewem zaczyna kwestionować swoje naukowe przekonania, odkrywając głęboką więź między tym, co widzialne, a tym, co nieuchwytne.'),
 (24, 9, 'pl', 'Alfa', 'Pogrążona w żalu kobieta, która sprawdza swoje granice w australijskiej dziczy, zostaje niespodziewanie wciągnięta w śmiertelnie niebezpieczną grę z bezwzględnym przeciwnikiem.'),
 (25, 10, 'pl', 'Tom Clancy: Jack Ryan - Wojna duchów', 'W nowym filmie Jack Ryan niechętnie wraca do świata szpiegostwa, gdy międzynarodowa tajna misja ujawnia śmiertelny spisek, zmuszając go do konfrontacji z nieokiełznaną jednostką operacji specjalnych pod ogromną presją czasu. Działając w czasie rzeczywistym, gdy stawką jest ludzkie życie, a zagrożenie narasta z każdą chwilą, Jack ponownie łączy siły z doświadczonym agentem CIA Mikiem Novemberem (Michael Kelly) oraz byłym szefem CIA Jamesem Greerem (Wendell Pierce). Ich wspólne doświadczenie to jedyna przewaga w starciu z przeciwnikiem, który zna każdy ich ruch. Wspierani przez nieoczywistą nową partnerkę – niezwykle bystrą agentkę MI6 Emmę Marlowe (Sienna Miller) – Jack i jego zespół poruszają się w zdradzieckiej sieci intryg, mierząc się z przeszłością, którą już dawno uznali za zamkniętą. To najbardziej osobista i ryzykowna misja, z jaką kiedykolwiek przyszło im się zmierzyć.'),
@@ -202,29 +157,21 @@ INSERT INTO `film_translations` (`id`, `film_id`, `language_code`, `title`, `des
 (80, 25, 'pl', 'Martwe zło: Ogień', 'Po śmierci męża kobieta szuka ukojenia u teściów w ich odosobnionym domu na pustkowiu. Spokój szybko zamienia się w koszmar, gdy kolejni członkowie rodziny, jeden po drugim, padają ofiarą mrocznej siły i przemieniają się w Deadites, opętanych przez demoniczne moce przywołane z księgi Necronomicon Ex-Mortis.\r\nW obliczu narastającego zła kobieta odkrywa przerażającą prawdę: przysięgi złożone za życia nie tracą mocy nawet po śmierci.'),
 (81, 26, 'en', 'Troy', 'People have been fighting for centuries. Some for power, others for glory or honor, and some for love. In ancient Greece, the passion that united the most famous lovers in world literature—Paris, Prince of Troy ( Orlando Bloom ) and Helen ( Diane Kruger ), Queen of Sparta—ignited a war that brought an entire civilization to ruins. Helen\'s abduction is an insult that her husband, King Menelaus ( Brendan Gleeson ), cannot let go. An affront to Menelaus is an affront to the entire family. The queen\'s husband\'s brother, the powerful king of Mycenae, Agamemnon, soon unites numerous Greek tribes and leads them to Troy to fight in defense of his brother\'s tarnished honor. In reality, honor is merely a convenient pretext; Agamemnon\'s true motive for embarking on this expedition is greed—he must conquer Troy to gain control of the Aegean Sea, which will ensure his kingdom\'s undisputed leadership. Troy is a great city, surrounded by mighty walls, ruled by King Priam ( Peter Toole ) and defended by the valiant Prince Hector ( Eric Bana ). No one has ever breached the city walls. However, the key to victory or defeat in the Trojan War lies with one man – Achilles ( Brad Pitt ), considered the greatest warrior alive. Arrogant, rebellious, and invincible, Achilles serves no one and nothing; he is interested only in his own glory. It is his great desire for glory that leads him to the gates of Troy under Agamemnon\'s banner, but his fate will be decided by love. Two worlds fight for honor and power. Thousands will die in the quest for glory. Love will bring destruction to an entire nation.'),
 (82, 26, 'pl', 'Troja\r\n\r\n\r\n', 'Ludzie walczą od stuleci. Niektórzy ze względu na władzę, inni z powodu chwały lub honoru, niektórzy zaś z miłości. W starożytnej Grecji namiętność, jaka połączyła parę najbardziej znanych kochanków w literaturze świata - Parysa, księcia Troi (Orlando Bloom) i Helenę (Diane Kruger), królową Sparty, stała się przyczyną wojny, za której przyczyną legła w ruinach cała cywilizacja. Porwanie Heleny to obraza, której mąż, król Menelaos (Brendan Gleeson), nie może puścić płazem. Afront dla Menelaosa to afront dla całej rodziny brat męża królowej, potężny król Myken, Agamemnon, jednoczy wkrótce wokół siebie liczne plemiona Greków i prowadzi je pod Troję, by walczyć w obronie splamionego honoru swego brata. W rzeczywistości honor jest jedynie wygodnym pretekstem, prawdziwą przyczyną wyruszenia Agamemnona na wyprawę jest chciwość musi zdobyć Troję, by zdobyć panowanie nad morzem Egejskim, co zapewni jego królestwu niekwestionowane przywództwo. Troja to wielkie miasto, otoczone potężnymi murami, włada nim król Priam (Peter Toole), broni go waleczny książę Hektor (Eric Bana). Nikt nigdy nie przełamał murów miasta. Kluczem do zwycięstwa lub porażki w wojnie trojańskiej jest jednak jeden człowiek - Achilles (Brad Pitt), którego uważa się za najlepszego żyjącego wojownika. Arogancki, buntowniczy i niepokonany Achilles nie służy nikomu i niczemu, interesuje go wyłącznie własna chwała. To właśnie wielka żądza chwały prowadzi go pod wrota Troi pod sztandarem Agamemnona, lecz o jego losie zadecyduje miłość. Dwa światy walczą o honor i władzę. Tysiące ludzi zginie w poszukiwaniu chwały. Miłość przyniesie zagładę całemu narodowi.'),
-(83, 27, 'en', 'What We Don\'t Tell Each Other', 'Carlo and Elisa live in Rome, building a seemingly successful relationship. He\'s a university philosophy professor and a writer struggling with a creative crisis. She, in turn, is a talented, brilliant journalist whose columns appear in international lifestyle magazines. Their relationship, spanning two decades, is increasingly plagued by routine and distance.\r\n\r\nTo regain their former energy, they decide to travel to Morocco with their longtime friends, Anna and Paolo, and their thirteen-year-old daughter, Vittoria—an intelligent, inquisitive, and eccentric teenager. It turns out they\'re also going through a serious crisis, which affects the girl most. Vittoria, who can\'t get along with her parents, finds support in Carlo, forming a close bond with him. This is only the beginning of the problems to come...'),
-(84, 27, 'pl', 'O czym sobie nie mówimy', 'Carlo i Elisa mieszkają w Rzymie, tworząc z pozoru udany związek. On jest profesorem filozofii na uniwersytecie i pisarzem walczącym z kryzysem twórczym. Ona z kolei to utalentowana, błyskotliwa dziennikarka, której felietony ukazują się w międzynarodowych magazynach lifestylowych. Do ich trwającego od dwóch dekad związku wkrada się coraz więcej rutyny oraz dystansu.\r\n\r\nAby odzyskać dawną energię, decydują się na wyjazd do Maroka w towarzystwie wieloletnich przyjaciół: Anny i Paola oraz ich trzynastoletniej córki Vittorii - inteligentnej, dociekliwej i ekscentrycznej nastolatki. Okazuje się, że także oni przeżywają poważny kryzys, który najbardziej odbija się na dziewczynce. Vittoria, która nie może dogadać się z rodzicami, znajduje oparcie w Carlu, nawiązując z nim bliską więź. To dopiero początek nadchodzących problemów…'),
 (85, 28, 'en', 'Toy Story 5', 'Bonnie\'s parents buy her a Lilypad tablet—a gadget that all children already have. The device captures the girl\'s attention. Wanting to prove it\'s better than toys, it connects its owner with her ballet friends. Cowgirl Jessie has doubts this connection will develop into a true friendship. She and Mustang hide in Bonnie\'s suitcase and go on a sleepover with her. '),
 (86, 28, 'pl', 'Toy Story 5', 'Rodzice kupują Bonnie tablet Lilypad – gadżet, który mają już wszystkie dzieci. Urządzenie zagarnia całą uwagę dziewczynki. Chcąc udowodnić, że jest lepsze od zabawek, kontaktuje swoją właścicielkę z koleżankami z baletu. Kowbojka Jessie ma wątpliwości, czy ta znajomość przerodzi się w prawdziwą przyjaźń. Wraz z Mustangiem ukrywa się w walizce Bonnie i rusza z nią na nocowankę. '),
 (87, 29, 'en', 'The Mummy', 'A young girl, Katie ( Natalie Grace ), the daughter of a journalist, mysteriously disappears without a trace in the desert. Eight years later, the grieving family is shocked when she suddenly reappears, seemingly unharmed. However, what initially seems like a joyful reunion quickly turns into a nightmare as her loved ones begin to understand that the returned girl is profoundly changed and harbors an otherworldly, sinister force linked to an ancient curse.'),
 (88, 29, 'pl', 'Mumia: Film Lee Cronina', 'Młoda dziewczyna Katie (Natalie Grace), córka dziennikarza, tajemniczo znika bez śladu na pustyni. Osiem lat później cierpiąca rodzina przeżywa szok, gdy nagle pojawia się ponownie, pozornie cała i zdrowa. Jednak to, co początkowo wydaje się radosnym spotkaniem, szybko przeradza się w koszmar, gdy bliscy zaczynają rozumieć, że dziewczyna, która wróciła, jest głęboko odmieniona i skrywa w sobie pozaziemską, złowrogą siłę związaną ze starożytną klątwą.'),
-(89, 30, 'en', 'Oppenheimer', 'During World War II,  Oppenheimer was director of the Manhattan nuclear weapons program. Besides his work on atomic weapons, Oppenheimer  had remarkable achievements in other fields of physics, including the study of black holes and cosmic rays. After developing the atomic bomb, he devoted the rest of his life to efforts to limit the spread of nuclear weapons. He was accused by the American government and intelligence agencies of ties to the communist movement and espionage. In the 1950s, he was denied access to classified documents. It was not until President Kennedy achieved his political rehabilitation  that Oppenheimer  is considered a symbol of pacifism and opposition to the proliferation of nuclear weapons.'),
-(90, 30, 'pl', 'Oppenheimer', 'Oppenheimer w czasie II wojny światowej był dyrektorem programu rozwoju broni jądrowej \"Manhattan\".  Poza działalnością związaną z bronią atomową Oppenheimer miał ogromne osiągnięcia w innych dziedzinach fizyki, między innymi w badaniach czarnych dziur oraz promieniowania kosmicznego. Resztę życia po opracowaniu bomby atomowej poświęcił na działalność na rzecz ograniczania rozprzestrzeniania się broni jądrowej. Był oskarżany przez amerykański rząd i służby o powiązania z ruchem komunistycznym oraz działalność szpiegowską. W latach 50. został pozbawiony dostępu do tajnych dokumentów. Dopiero prezydent Kennedy dokonał jego politycznej rehabilitacji. Oppenheimer jest dziś uznawany za jeden z symboli pacyfizmu i sprzeciwu wobec rozprzestrzeniania broni atomowej.');
-
--- --------------------------------------------------------
-
---
--- Struktura tabeli dla tabeli `genres`
---
+(111, 27, 'en', 'What We Don\'t Tell Each Other', 'Carlo and Elisa live in Rome, building a seemingly successful relationship. He\'s a university philosophy professor and a writer struggling with a creative crisis. She, in turn, is a talented, brilliant journalist whose columns appear in international lifestyle magazines. Their relationship, spanning two decades, is increasingly plagued by routine and distance.\r\n\r\nTo regain their former energy, they decide to travel to Morocco with their longtime friends, Anna and Paolo, and their thirteen-year-old daughter, Vittoria—an intelligent, inquisitive, and eccentric teenager. It turns out they\'re also going through a serious crisis, which affects the girl most. Vittoria, who can\'t get along with her parents, finds support in Carlo, forming a close bond with him. This is only the beginning of the problems to come...'),
+(112, 27, 'pl', 'O czym sobie nie mówimy', 'Carlo i Elisa mieszkają w Rzymie, tworząc z pozoru udany związek. On jest profesorem filozofii na uniwersytecie i pisarzem walczącym z kryzysem twórczym. Ona z kolei to utalentowana, błyskotliwa dziennikarka, której felietony ukazują się w międzynarodowych magazynach lifestylowych. Do ich trwającego od dwóch dekad związku wkrada się coraz więcej rutyny oraz dystansu.\r\n\r\nAby odzyskać dawną energię, decydują się na wyjazd do Maroka w towarzystwie wieloletnich przyjaciół: Anny i Paola oraz ich trzynastoletniej córki Vittorii - inteligentnej, dociekliwej i ekscentrycznej nastolatki. Okazuje się, że także oni przeżywają poważny kryzys, który najbardziej odbija się na dziewczynce. Vittoria, która nie może dogadać się z rodzicami, znajduje oparcie w Carlu, nawiązując z nim bliską więź. To dopiero początek nadchodzących problemów…'),
+(117, 7, 'en', 'Project Hail Mary', 'Science teacher Ryland Grace ( Ryan Gosling ) wakes up on a spaceship light-years from home with no memory of who he is or how he got there. As his memory returns, he begins to unravel his mission: to solve the mystery of a mysterious substance causing the sun to fade. He must use his scientific knowledge and unconventional ideas to save everything on Earth from destruction, but an unexpected friendship means he may not have to do it alone.'),
+(118, 7, 'pl', 'Projekt Hail Mary', 'Nauczyciel nauk ścisłych Ryland Grace (Ryan Gosling) budzi się na statku kosmicznym lata świetlne od domu, nie pamiętając, kim jest ani jak się tam znalazł. Gdy wraca mu pamięć, zaczyna odkrywać swoją misję: rozwiązać zagadkę tajemniczej substancji powodującej wygaśnięcie słońca. Musi wykorzystać swoją wiedzę naukową i niekonwencjonalne pomysły, aby ocalić wszystko na Ziemi przed zagładą, ale nieoczekiwana przyjaźń oznacza, że być może nie będzie musiał robić tego sam.'),
+(121, 30, 'en', 'Oppenheimer', 'During World War II,  Oppenheimer was director of the Manhattan nuclear weapons program. Besides his work on atomic weapons, Oppenheimer  had remarkable achievements in other fields of physics, including the study of black holes and cosmic rays. After developing the atomic bomb, he devoted the rest of his life to efforts to limit the spread of nuclear weapons. He was accused by the American government and intelligence agencies of ties to the communist movement and espionage. In the 1950s, he was denied access to classified documents. It was not until President Kennedy achieved his political rehabilitation  that Oppenheimer  is considered a symbol of pacifism and opposition to the proliferation of nuclear weapons.'),
+(122, 30, 'pl', 'Oppenheimer', 'Oppenheimer w czasie II wojny światowej był dyrektorem programu rozwoju broni jądrowej \"Manhattan\".  Poza działalnością związaną z bronią atomową Oppenheimer miał ogromne osiągnięcia w innych dziedzinach fizyki, między innymi w badaniach czarnych dziur oraz promieniowania kosmicznego. Resztę życia po opracowaniu bomby atomowej poświęcił na działalność na rzecz ograniczania rozprzestrzeniania się broni jądrowej. Był oskarżany przez amerykański rząd i służby o powiązania z ruchem komunistycznym oraz działalność szpiegowską. W latach 50. został pozbawiony dostępu do tajnych dokumentów. Dopiero prezydent Kennedy dokonał jego politycznej rehabilitacji. Oppenheimer jest dziś uznawany za jeden z symboli pacyfizmu i sprzeciwu wobec rozprzestrzeniania broni atomowej.');
 
 CREATE TABLE `genres` (
   `id` int(11) NOT NULL,
   `name` varchar(255) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
---
--- Dumping data for table `genres`
---
 
 INSERT INTO `genres` (`id`, `name`) VALUES
 (4, 'action'),
@@ -248,30 +195,14 @@ INSERT INTO `genres` (`id`, `name`) VALUES
 (5, 'thriller'),
 (12, 'western');
 
--- --------------------------------------------------------
-
---
--- Struktura tabeli dla tabeli `languages`
---
-
 CREATE TABLE `languages` (
   `code` varchar(5) NOT NULL,
   `name` varchar(50) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
---
--- Dumping data for table `languages`
---
-
 INSERT INTO `languages` (`code`, `name`) VALUES
 ('en', 'English'),
 ('pl', 'Polish');
-
--- --------------------------------------------------------
-
---
--- Struktura tabeli dla tabeli `users`
---
 
 CREATE TABLE `users` (
   `id` int(11) NOT NULL,
@@ -295,10 +226,6 @@ CREATE TABLE `users` (
   `suspended_by` int(11) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
---
--- Dumping data for table `users`
---
-
 INSERT INTO `users` (`id`, `password`, `username`, `avatar_url`, `email`, `created_at`, `role`, `status`, `suspended_until`, `ban_reason`, `banned_at`, `banned_by`, `bio`, `language_code`, `reset_token`, `reset_token_expiry`, `suspend_reason`, `suspended_at`, `suspended_by`) VALUES
 (1, '$2b$10$Es87v11WUTL9JPouu8Rpm.seoqi8mKjfU4nkFCcm3zmBDLfHrjRJK', 'sdad', NULL, 'ada@dsad', '2026-05-30', 0, 'ACTIVE', NULL, NULL, NULL, NULL, 'Lubie filmy', 'pl', NULL, NULL, 'iiko', '2026-07-26 18:43:58', 27),
 (5, '$2b$10$KclL0BMKWGPuLXmbUWMZPu2Rsh/0lcLO4MoALB92DKgBh.nWMLbgS', 'Emilda', NULL, 'emil@gmail.com', '2026-05-30', 0, 'ACTIVE', NULL, NULL, NULL, NULL, 'lubie filmy 1234543sdasdsa', 'pl', NULL, NULL, NULL, NULL, NULL),
@@ -309,10 +236,10 @@ INSERT INTO `users` (`id`, `password`, `username`, `avatar_url`, `email`, `creat
 (12, '$2b$10$Q2iRAHG/ThhVV5V6lRqMkeeosM3DZr0U6sxG4HRvtGLGFQpfqxpT2', 'test', NULL, 'test@2', '2026-05-31', 0, 'ACTIVE', NULL, NULL, NULL, NULL, 'Nie ma opisu bo nie ma długopisu', 'pl', NULL, NULL, 'dsad', '2026-07-23 21:10:31', 16),
 (13, '$2b$10$sbV4OklU8VjFGkmejZpByuJm2fh.BIkysTlqLWBwmsXvvzKgpzBxW', 'guest', NULL, 'Filip@1', '2026-06-26', 0, 'ACTIVE', NULL, NULL, NULL, NULL, 'bio', 'en', NULL, NULL, 'dassda', '2026-07-23 21:10:34', 16),
 (15, '$2b$10$lgjzWtfjGRkVwWh1PxSIW.6dqOTZ.xF43GRdAgEtaHgVViO1Qb8IK', 'Filipfs', '/uploads/21bbb392927c8aa55e1357268718efd9.webp', 'Filip@2', '2026-06-30', 0, 'ACTIVE', NULL, NULL, NULL, NULL, 'dsasdss', 'pl', NULL, NULL, 'dsada', '2026-07-23 21:10:37', 16),
-(16, '$2b$10$aC2dqkn.1WfnQfBabEeHK.ywYgLTPIoFjtbJFS40422uAHl5Ij3Lu', 'filipDziopa2', '/uploads/9a28a3c27a311f167bee6907942afbf0.webp', 'filip.dziopa2@gmail.com', '2026-07-10', 1, 'ACTIVE', NULL, NULL, NULL, NULL, 'dsdas', 'pl', 'a2d6366017e377726a36b6cf9f5841063f48a19ddc65a81d447dd929da877731', '2026-07-23 00:42:47', NULL, NULL, NULL),
+(16, '$2b$10$eFVQtg5LtMPsoXlPKnWEeOt5Im9V77TbK9zqavgXbbj1IhTWSuCgu', 'filipDziopa2', '/uploads/9a28a3c27a311f167bee6907942afbf0.webp', 'filip.dziopa2@gmail.com', '2026-07-10', 1, 'ACTIVE', NULL, NULL, NULL, NULL, 'dsdas', 'en', NULL, NULL, NULL, NULL, NULL),
 (17, '$2b$10$cnviKJ/Qyy.MF4/p0eyQB.sRRsHG7WZsaydUuvrBaZe4HHdnA.gQm', 'Filip98', NULL, 'Filip98@gmail.com', '2026-07-11', 0, 'ACTIVE', NULL, NULL, NULL, NULL, NULL, 'pl', NULL, NULL, 'dasda', '2026-07-23 21:10:41', 16),
 (18, '$2b$10$69naqYyByxJ/ILZOf7x7.eecg2cHrMhaYZLk3htlYdk8H8oTZl5VK', 'Filip99@gmail.com', NULL, 'Filip99@gmail.com', '2026-07-11', 0, 'ACTIVE', NULL, NULL, NULL, NULL, NULL, 'en', NULL, NULL, 'dsada', '2026-07-23 21:10:44', 16),
-(21, '$2b$10$aJZBvAM9wPPnt3rzZPH2tePXRBYSgeXfgbEGH0NTqGqIw0tTa8giC', 'Filip123', NULL, 'filip.dziopa3@gmail.com', '2026-07-18', 1, 'ACTIVE', NULL, NULL, NULL, NULL, NULL, 'en', NULL, NULL, 'okok', '2026-07-26 18:44:45', 27),
+(21, '$2b$10$aJZBvAM9wPPnt3rzZPH2tePXRBYSgeXfgbEGH0NTqGqIw0tTa8giC', 'Filip123', '/uploads/f55e8db7f3ac58a6830c85405c831d3b.webp', 'filip.dziopa3@gmail.com', '2026-07-18', 1, 'ACTIVE', NULL, NULL, NULL, NULL, 'fsd', 'en', NULL, NULL, 'okok', '2026-07-26 18:44:45', 27),
 (22, '$2b$10$k6usLnDpIax4ugrcN7k4i.YArE1A.GA4LeQ1X5qoW2VmbrgyiE5o6', 'Filip', NULL, 'filip.dziopa4@gmail.com', '2026-07-18', 0, 'BANNED', NULL, 'ko', '2026-07-26 18:47:28', 16, NULL, 'en', NULL, NULL, NULL, NULL, NULL),
 (23, '$2b$10$vg4KlS2udN/d02bC58ceL.98N/cc6ZQn9SpmKkQiyzLsjTEKMxrj2', 'Filip123', '/uploads/87502bd62282b1b1809e9cefc6bc48ad.webp', 'filip.dziopa5@gmail.com', '2026-07-18', 0, 'ACTIVE', NULL, NULL, NULL, NULL, 'dsad', 'en', NULL, NULL, 'jko', '2026-07-26 18:47:36', 16),
 (24, '$2b$10$UPOqW6eC0mfu.8SGvPicRO2DkFhEUChY5X5V4U1qK1q58WgqiBhsW', 'Filip', NULL, 'filip.dziopa6@gmail.com', '2026-07-18', 0, 'ACTIVE', NULL, NULL, NULL, NULL, NULL, 'en', NULL, NULL, NULL, NULL, NULL),
@@ -759,58 +686,184 @@ INSERT INTO `users` (`id`, `password`, `username`, `avatar_url`, `email`, `creat
 (466, '$2b$10$f17ba5333bde7b1153932902c0b53187', 'Test434', NULL, 'Test434@gmail.com', '2026-07-22', 0, 'ACTIVE', NULL, NULL, NULL, NULL, NULL, 'en', NULL, NULL, NULL, NULL, NULL),
 (467, '$2b$10$855688abb960cdbada4052543deea4b3', 'Test435', NULL, 'Test435@gmail.com', '2026-07-22', 0, 'ACTIVE', NULL, NULL, NULL, NULL, NULL, 'en', NULL, NULL, NULL, NULL, NULL),
 (468, '$2b$10$129e5f4c86380e884ec0b55425100b0a', 'Test436', NULL, 'Test436@gmail.com', '2026-07-22', 0, 'ACTIVE', NULL, NULL, NULL, NULL, NULL, 'en', NULL, NULL, NULL, NULL, NULL),
-(469, '$2b$10$55e6077fe377fed37bc7cd854ff94ab2', 'Test437', NULL, 'Test437@gmail.com', '2026-07-22', 0, 'ACTIVE', NULL, NULL, NULL, NULL, NULL, 'en', NULL, NULL, NULL, NULL, NULL),
+(469, '$2b$10$55e6077fe377fed37bc7cd854ff94ab2', 'Test437', NULL, 'Test437@gmail.com', '2026-07-22', 0, 'SUSPENDED', '2027-02-12 18:20:00', NULL, NULL, NULL, NULL, 'en', NULL, NULL, 'dsada', '2026-08-30 18:20:28', 21),
 (470, '$2b$10$29dc9e95b8bd7fb75511caf16e1571f7', 'Test438', NULL, 'Test438@gmail.com', '2026-07-22', 0, 'ACTIVE', NULL, NULL, NULL, NULL, NULL, 'en', NULL, NULL, NULL, NULL, NULL),
 (471, '$2b$10$244d3423b853cabfbebc9dafab1a35da', 'Test439', NULL, 'Test439@gmail.com', '2026-07-22', 0, 'ACTIVE', NULL, NULL, NULL, NULL, NULL, 'en', NULL, NULL, NULL, NULL, NULL),
 (472, '$2b$10$3639a1ca89f8f8d3e2ba1b44019941ed', 'Test440', NULL, 'Test440@gmail.com', '2026-07-22', 0, 'ACTIVE', NULL, NULL, NULL, NULL, NULL, 'en', NULL, NULL, NULL, NULL, NULL),
 (473, '$2b$10$c16c73f2b8139c4e75089d306361eec3', 'Test441', NULL, 'Test441@gmail.com', '2026-07-22', 0, 'ACTIVE', NULL, NULL, NULL, NULL, NULL, 'en', NULL, NULL, NULL, NULL, NULL),
 (474, '$2b$10$97956f125377ab8c343c0b438457a9fc', 'Test442', NULL, 'Test442@gmail.com', '2026-07-22', 0, 'ACTIVE', NULL, NULL, NULL, NULL, NULL, 'en', NULL, NULL, NULL, NULL, NULL),
 (475, '$2b$10$3dd9f3a4e69f0f5190c8d0df340f71a7', 'Test443', NULL, 'Test443@gmail.com', '2026-07-22', 0, 'ACTIVE', NULL, NULL, NULL, NULL, NULL, 'en', NULL, NULL, NULL, NULL, NULL),
-(476, '$2b$10$4a1debeb5dd14dc60e964315bc598139', 'Test444', NULL, 'Test444@gmail.com', '2026-07-22', 0, 'ACTIVE', NULL, NULL, NULL, NULL, NULL, 'en', NULL, NULL, NULL, NULL, NULL),
-(477, '$2b$10$211c7db15f1a81d4d9b638c72b82aa68', 'Test445', NULL, 'Test445@gmail.com', '2026-07-22', 0, 'ACTIVE', NULL, NULL, NULL, NULL, NULL, 'en', NULL, NULL, NULL, NULL, NULL),
-(478, '$2b$10$9a9d045ec7b83bdfa336c634b6e29af3', 'Test446', NULL, 'Test446@gmail.com', '2026-07-22', 0, 'ACTIVE', NULL, NULL, NULL, NULL, NULL, 'en', NULL, NULL, NULL, NULL, NULL),
-(479, '$2b$10$784e7292628485a920c8c776a05865b1', 'Test447', NULL, 'Test447@gmail.com', '2026-07-22', 0, 'ACTIVE', NULL, NULL, NULL, NULL, NULL, 'en', NULL, NULL, NULL, NULL, NULL),
+(476, '$2b$10$4a1debeb5dd14dc60e964315bc598139', 'Test444', NULL, 'Test444@gmail.com', '2026-07-22', 0, 'SUSPENDED', '2026-11-05 18:17:00', NULL, NULL, NULL, NULL, 'en', NULL, NULL, 'dasda', '2026-08-30 18:17:47', 21),
+(477, '$2b$10$211c7db15f1a81d4d9b638c72b82aa68', 'Test445', NULL, 'Test445@gmail.com', '2026-07-22', 0, 'SUSPENDED', '2026-12-18 18:17:00', NULL, NULL, NULL, NULL, 'en', NULL, NULL, 'dsassd', '2026-08-30 18:17:42', 21),
+(478, '$2b$10$9a9d045ec7b83bdfa336c634b6e29af3', 'Test446', NULL, 'Test446@gmail.com', '2026-07-22', 0, 'BANNED', NULL, 'dasda', '2026-08-30 18:17:33', 21, NULL, 'en', NULL, NULL, NULL, NULL, NULL),
+(479, '$2b$10$784e7292628485a920c8c776a05865b1', 'Test447', NULL, 'Test447@gmail.com', '2026-07-22', 0, 'BANNED', NULL, 'dasad', '2026-08-30 18:17:35', 21, NULL, 'en', NULL, NULL, NULL, NULL, NULL),
 (480, '$2b$10$24a8724b2f0b8a030579875a7d7a3046', 'Test448', NULL, 'Test448@gmail.com', '2026-07-22', 0, 'ACTIVE', NULL, NULL, NULL, NULL, NULL, 'en', NULL, NULL, NULL, NULL, NULL),
-(481, '$2b$10$09cd41502871490da99d70f42f440aea', 'Test449', NULL, 'Test449@gmail.com', '2026-07-22', 0, 'ACTIVE', NULL, NULL, NULL, NULL, NULL, 'en', NULL, NULL, NULL, NULL, NULL),
-(482, '$2b$10$1a061977aaa123b61ab1b45ee3608dcf', 'Test450', NULL, 'Test450@gmail.com', '2026-07-22', 0, 'ACTIVE', NULL, NULL, NULL, NULL, NULL, 'en', NULL, NULL, NULL, NULL, NULL),
+(481, '$2b$10$09cd41502871490da99d70f42f440aea', 'Test449', NULL, 'Test449@gmail.com', '2026-07-22', 0, 'BANNED', NULL, 'dsada', '2026-08-30 18:17:31', 21, NULL, 'en', NULL, NULL, NULL, NULL, NULL),
+(482, '$2b$10$1a061977aaa123b61ab1b45ee3608dcf', 'Test450', NULL, 'Test450@gmail.com', '2026-07-22', 0, 'BANNED', NULL, 'dsad', '2026-08-30 18:17:29', 21, NULL, 'en', NULL, NULL, NULL, NULL, NULL),
 (483, '$2b$10$Q1cPxkvg939YCIaukN8V3.kThqQzgP5aGcA4R5cOTENKdlLEgyijq', 'Laura123', '/uploads/0867887443ba57338e8195e37312efb5.webp', 'laura@gmail.com', '2026-07-23', 1, 'ACTIVE', NULL, NULL, NULL, NULL, 'Nie ma opisu bo nie ma długopisu', 'pl', NULL, NULL, NULL, NULL, NULL),
 (484, '$2b$10$67C7DrzyYmdn01dwjFWzmO2PN3nD4vRem5hlCoWghbP4oIqOKegr6', 'Filip64', '/uploads/a45cffe737eaa5c0321edfb94c491612.webp', 'filip.dziopa43@gmail.com', '2026-07-29', 0, 'BANNED', NULL, ' bnh', '2026-08-14 19:15:56', 16, 'dsa', 'pl', NULL, NULL, NULL, NULL, NULL),
 (485, '$2b$10$TYHAEk7UW1r7t/z5xuIn5uWCPAhByaOmSWKk5Xld2QJ4KCMxMa52G', 'FilipAdmin', NULL, 'filip.dziopaAdmin@gmail.com', '2026-07-29', 1, 'ACTIVE', NULL, NULL, NULL, NULL, NULL, 'en', NULL, NULL, NULL, NULL, NULL),
 (486, '$2b$10$e8jJhWpldt6NM0Eu8l9fcufGrKVGC6iwAhxLpo65fLukMIQOlURvy', 'filipAdmin2', NULL, 'filip.dziopaAdmin2@gmail.com', '2026-07-29', 1, 'ACTIVE', NULL, NULL, NULL, NULL, NULL, 'en', NULL, NULL, NULL, NULL, NULL),
 (487, '$2b$10$2F/A0UdC8rhLY1mE8uzKBucvfsLJCmf29C0XzSzP16rwQYFMoy/16', 'Admin', NULL, 'filip.dziopaAdmin3@gmail.com', '2026-07-29', 1, 'ACTIVE', NULL, NULL, NULL, NULL, NULL, 'en', NULL, NULL, NULL, NULL, NULL),
 (489, '$2b$10$l83kyUGLUJt8BRgj7bk2/uFli2qQYRhgiNF9IRGslNGkYv7qnpGoe', 'Filip', NULL, 'filip.dziopaAdmin5@gmail.com', '2026-07-29', 1, 'ACTIVE', NULL, NULL, NULL, NULL, NULL, 'en', NULL, NULL, NULL, NULL, NULL),
-(490, '$2b$10$rwdHe0BVk/lL05TdIdxmvO4LV6t.5c5WLoRI8qDKBuUuFQgSIgoEi', 'Filip', NULL, 'filip.dziopa123234@gmail.com', '2026-08-16', 0, 'ACTIVE', NULL, NULL, NULL, NULL, NULL, 'pl', NULL, NULL, NULL, NULL, NULL),
-(492, '$2b$10$Cdy.sv2VQsFoRl2ji4AEgeCp1M6GyFCZg6sOguqAjOCJhDg1D4/eK', 'testuser', NULL, 'test@example.com', '2026-08-18', 0, 'ACTIVE', NULL, NULL, NULL, NULL, NULL, 'en', NULL, NULL, NULL, NULL, NULL),
-(493, '$2b$10$nJc0p60CuddhS4E0mKyQxurg3pL80moyGW1CIgAN7tX1wAfzYl6Au', 'testuser', NULL, 'existing@example.com', '2026-08-18', 0, 'ACTIVE', NULL, NULL, NULL, NULL, NULL, 'en', NULL, NULL, NULL, NULL, NULL);
-
--- --------------------------------------------------------
-
---
--- Struktura tabeli dla tabeli `user_activity`
---
+(490, '$2b$10$rwdHe0BVk/lL05TdIdxmvO4LV6t.5c5WLoRI8qDKBuUuFQgSIgoEi', 'Filip', NULL, 'filip.dziopa123234@gmail.com', '2026-08-16', 0, 'BANNED', NULL, 'dsadas', '2026-08-30 18:17:27', 21, NULL, 'pl', NULL, NULL, NULL, NULL, NULL),
+(492, '$2b$10$Cdy.sv2VQsFoRl2ji4AEgeCp1M6GyFCZg6sOguqAjOCJhDg1D4/eK', 'testuser', NULL, 'test@example.com', '2026-08-18', 0, 'BANNED', NULL, 'dsada', '2026-08-30 18:17:24', 21, NULL, 'en', NULL, NULL, NULL, NULL, NULL),
+(493, '$2b$10$nJc0p60CuddhS4E0mKyQxurg3pL80moyGW1CIgAN7tX1wAfzYl6Au', 'testuser', NULL, 'existing@example.com', '2026-08-18', 0, 'ACTIVE', NULL, NULL, NULL, NULL, NULL, 'en', NULL, NULL, 'dassda', '2026-08-30 17:24:57', 16),
+(510, '$2b$10$JFbn5H8JFR11a2b4eyjvque9S89sdudC9q.3EgH/mIu4rcCkBklLG', 'filip', NULL, 'filip.dziopa0909@gmail.com', '2026-08-30', 0, 'ACTIVE', NULL, NULL, NULL, NULL, NULL, 'en', NULL, NULL, NULL, NULL, NULL),
+(512, '$2b$10$eWAVaW1M5H/xxIy4a7FjVeKjvacybgrkt.kRtFn2NFMRDou6anSQC', 'filip', NULL, 'filip.dziopa09092@gmail.com', '2026-08-30', 1, 'ACTIVE', NULL, NULL, NULL, NULL, NULL, 'en', NULL, NULL, NULL, NULL, NULL);
 
 CREATE TABLE `user_activity` (
   `id` int(11) NOT NULL,
   `user_id` int(11) NOT NULL,
-  `action` varchar(255) NOT NULL,
+  `action` enum('FILM_LIKED','FILM_UNLIKED','FILM_WATCHED','FILM_UNWATCHED','USER_REGISTERED','USER_LOGGED_IN','PROFILE_UPDATED','USERNAME_CHANGED','BIO_UPDATED','LANGUAGE_CHANGED','AVATAR_UPDATED','PASSWORD_CHANGED','PASSWORD_RESET_REQUESTED','PASSWORD_RESET_COMPLETED','USER_BANNED','USER_UNBANNED','USER_SUSPENDED','USER_UNSUSPENDED','USER_PROMOTED','GENRE_CREATED','GENRE_UPDATED','GENRE_DELETED','FILM_CREATED','FILM_UPDATED','FILM_DELETED') NOT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
--- --------------------------------------------------------
-
---
--- Struktura tabeli dla tabeli `user_favorites`
---
+INSERT INTO `user_activity` (`id`, `user_id`, `action`, `created_at`) VALUES
+(1, 493, 'USER_UNBANNED', '2026-08-30 15:24:39'),
+(2, 493, 'USER_SUSPENDED', '2026-08-30 15:24:57'),
+(3, 16, 'FILM_UNLIKED', '2026-08-30 15:25:00'),
+(4, 16, 'FILM_UNLIKED', '2026-08-30 15:25:01'),
+(5, 16, 'FILM_UNWATCHED', '2026-08-30 15:25:01'),
+(6, 16, 'FILM_UNWATCHED', '2026-08-30 15:25:02'),
+(7, 16, 'FILM_UNLIKED', '2026-08-30 15:25:03'),
+(8, 16, 'FILM_UNLIKED', '2026-08-30 15:25:04'),
+(9, 16, 'FILM_UNWATCHED', '2026-08-30 15:25:04'),
+(10, 16, 'FILM_LIKED', '2026-08-30 15:31:20'),
+(11, 16, 'FILM_LIKED', '2026-08-30 15:31:21'),
+(12, 16, 'FILM_UNWATCHED', '2026-08-30 15:31:29'),
+(13, 16, 'FILM_WATCHED', '2026-08-30 15:31:31'),
+(14, 16, 'FILM_UNWATCHED', '2026-08-30 15:31:32'),
+(15, 16, 'FILM_WATCHED', '2026-08-30 15:31:32'),
+(16, 16, 'FILM_WATCHED', '2026-08-30 15:31:33'),
+(17, 16, 'FILM_WATCHED', '2026-08-30 15:31:34'),
+(18, 21, 'USER_LOGGED_IN', '2026-08-30 15:37:47'),
+(19, 21, 'AVATAR_UPDATED', '2026-08-30 15:39:20'),
+(20, 21, 'BIO_UPDATED', '2026-08-30 15:44:24'),
+(21, 21, 'GENRE_CREATED', '2026-08-30 16:11:54'),
+(22, 21, 'GENRE_UPDATED', '2026-08-30 16:12:24'),
+(23, 21, 'GENRE_DELETED', '2026-08-30 16:12:26'),
+(24, 492, 'USER_BANNED', '2026-08-30 16:17:24'),
+(25, 490, 'USER_BANNED', '2026-08-30 16:17:27'),
+(26, 482, 'USER_BANNED', '2026-08-30 16:17:29'),
+(27, 481, 'USER_BANNED', '2026-08-30 16:17:31'),
+(28, 478, 'USER_BANNED', '2026-08-30 16:17:33'),
+(29, 479, 'USER_BANNED', '2026-08-30 16:17:35'),
+(30, 477, 'USER_SUSPENDED', '2026-08-30 16:17:42'),
+(31, 476, 'USER_SUSPENDED', '2026-08-30 16:17:47'),
+(32, 21, 'LANGUAGE_CHANGED', '2026-08-30 16:18:30'),
+(33, 469, 'USER_SUSPENDED', '2026-08-30 16:20:29'),
+(34, 21, 'FILM_LIKED', '2026-08-30 16:32:14'),
+(35, 21, 'FILM_WATCHED', '2026-08-30 16:32:14'),
+(36, 21, 'AVATAR_UPDATED', '2026-08-30 17:12:11'),
+(37, 21, 'LANGUAGE_CHANGED', '2026-08-30 17:23:57'),
+(38, 510, 'USER_REGISTERED', '2026-08-30 20:40:12'),
+(39, 16, 'USER_LOGGED_IN', '2026-08-30 20:40:26'),
+(40, 512, 'USER_REGISTERED', '2026-08-30 20:41:05'),
+(41, 16, 'USER_LOGGED_IN', '2026-08-30 20:41:13'),
+(42, 16, 'FILM_CREATED', '2026-08-30 21:50:05'),
+(43, 16, 'FILM_UPDATED', '2026-08-30 21:50:52'),
+(44, 16, 'FILM_LIKED', '2026-09-04 21:39:46'),
+(45, 16, 'FILM_WATCHED', '2026-09-04 21:39:47'),
+(46, 16, 'FILM_LIKED', '2026-09-04 21:39:52'),
+(47, 16, 'FILM_LIKED', '2026-09-04 21:39:53'),
+(48, 16, 'FILM_UNLIKED', '2026-09-04 21:40:09'),
+(49, 16, 'LANGUAGE_CHANGED', '2026-09-04 21:59:45'),
+(50, 21, 'USER_LOGGED_IN', '2026-09-04 22:11:09'),
+(51, 16, 'USER_LOGGED_IN', '2026-09-04 22:23:08'),
+(52, 16, 'USERNAME_CHANGED', '2026-09-04 22:42:52'),
+(53, 16, 'BIO_UPDATED', '2026-09-04 22:42:55'),
+(54, 16, 'FILM_UNWATCHED', '2026-09-04 22:42:57'),
+(55, 16, 'FILM_WATCHED', '2026-09-04 22:42:58'),
+(56, 16, 'FILM_UNLIKED', '2026-09-04 22:42:58'),
+(57, 16, 'FILM_UNWATCHED', '2026-09-04 22:43:17'),
+(58, 16, 'FILM_WATCHED', '2026-09-04 22:43:18'),
+(59, 16, 'FILM_UNWATCHED', '2026-09-04 22:43:18'),
+(60, 16, 'FILM_WATCHED', '2026-09-04 22:43:18'),
+(61, 16, 'FILM_UNWATCHED', '2026-09-04 22:43:18'),
+(62, 16, 'FILM_WATCHED', '2026-09-04 22:43:18'),
+(63, 16, 'FILM_UNWATCHED', '2026-09-04 22:43:18'),
+(64, 16, 'FILM_WATCHED', '2026-09-04 22:43:19'),
+(65, 16, 'FILM_UNWATCHED', '2026-09-04 22:43:19'),
+(66, 16, 'FILM_WATCHED', '2026-09-04 22:43:19'),
+(67, 16, 'FILM_UNWATCHED', '2026-09-04 22:43:19'),
+(68, 16, 'FILM_WATCHED', '2026-09-04 22:43:19'),
+(69, 16, 'FILM_UNWATCHED', '2026-09-04 22:43:19'),
+(70, 16, 'FILM_WATCHED', '2026-09-04 22:43:19'),
+(71, 16, 'FILM_UNWATCHED', '2026-09-04 22:43:20'),
+(72, 16, 'FILM_WATCHED', '2026-09-04 22:43:20'),
+(73, 16, 'FILM_UNWATCHED', '2026-09-04 22:43:20'),
+(74, 16, 'FILM_WATCHED', '2026-09-04 22:43:20'),
+(75, 16, 'FILM_UNWATCHED', '2026-09-04 22:43:20'),
+(76, 16, 'FILM_WATCHED', '2026-09-04 22:43:20'),
+(77, 16, 'FILM_UNWATCHED', '2026-09-04 22:43:21'),
+(78, 16, 'FILM_WATCHED', '2026-09-04 22:43:21'),
+(79, 512, 'USER_BANNED', '2026-09-04 22:44:21'),
+(80, 512, 'USER_UNBANNED', '2026-09-04 22:44:22'),
+(81, 512, 'USER_BANNED', '2026-09-04 22:44:26'),
+(82, 512, 'USER_UNBANNED', '2026-09-04 22:44:26'),
+(83, 512, 'USER_PROMOTED', '2026-09-04 22:44:32'),
+(84, 16, 'FILM_UNLIKED', '2026-09-04 22:44:39'),
+(85, 16, 'FILM_LIKED', '2026-09-04 22:44:40'),
+(86, 16, 'FILM_UNLIKED', '2026-09-05 14:03:08'),
+(87, 16, 'FILM_LIKED', '2026-09-05 14:03:08'),
+(88, 16, 'USER_LOGGED_IN', '2026-09-05 14:09:58'),
+(89, 16, 'USER_LOGGED_IN', '2026-09-05 14:09:58'),
+(90, 16, 'USER_LOGGED_IN', '2026-09-05 14:09:58'),
+(91, 16, 'USER_LOGGED_IN', '2026-09-05 14:09:58'),
+(92, 16, 'USER_LOGGED_IN', '2026-09-05 14:10:02'),
+(93, 16, 'USER_LOGGED_IN', '2026-09-05 14:13:33'),
+(94, 16, 'USER_LOGGED_IN', '2026-09-05 14:15:09'),
+(95, 16, 'USER_LOGGED_IN', '2026-09-05 14:26:08'),
+(96, 16, 'FILM_UNLIKED', '2026-09-05 15:04:18'),
+(97, 16, 'FILM_UNWATCHED', '2026-09-05 15:04:18'),
+(98, 16, 'FILM_LIKED', '2026-09-05 15:04:19'),
+(99, 16, 'FILM_UNLIKED', '2026-09-05 15:04:19'),
+(100, 16, 'FILM_WATCHED', '2026-09-05 15:04:19'),
+(101, 16, 'FILM_LIKED', '2026-09-05 15:04:20'),
+(102, 16, 'FILM_DELETED', '2026-09-05 15:04:37'),
+(103, 16, 'LANGUAGE_CHANGED', '2026-09-05 15:04:43'),
+(104, 16, 'LANGUAGE_CHANGED', '2026-09-05 15:05:07'),
+(105, 16, 'USER_LOGGED_IN', '2026-09-05 15:05:59'),
+(106, 16, 'USER_LOGGED_IN', '2026-09-05 16:06:38'),
+(107, 16, 'PASSWORD_RESET_REQUESTED', '2026-09-05 17:25:59'),
+(108, 16, 'PASSWORD_RESET_COMPLETED', '2026-09-05 17:26:47'),
+(109, 16, 'USER_LOGGED_IN', '2026-09-05 17:26:57'),
+(110, 16, 'FILM_UNWATCHED', '2026-09-05 17:27:12'),
+(111, 16, 'FILM_WATCHED', '2026-09-05 17:27:13'),
+(112, 16, 'USER_LOGGED_IN', '2026-09-05 17:36:43'),
+(113, 16, 'FILM_CREATED', '2026-09-05 17:37:35'),
+(114, 16, 'USER_LOGGED_IN', '2026-09-05 17:47:09'),
+(115, 16, 'FILM_CREATED', '2026-09-05 17:51:13'),
+(116, 16, 'LANGUAGE_CHANGED', '2026-09-05 18:11:00'),
+(117, 510, 'USER_BANNED', '2026-09-05 18:14:10'),
+(118, 510, 'USER_UNBANNED', '2026-09-05 18:14:11'),
+(119, 510, 'USER_SUSPENDED', '2026-09-05 18:14:14'),
+(120, 510, 'USER_UNSUSPENDED', '2026-09-05 18:14:15'),
+(121, 16, 'GENRE_CREATED', '2026-09-05 18:14:20'),
+(122, 16, 'GENRE_UPDATED', '2026-09-05 18:14:23'),
+(123, 16, 'GENRE_DELETED', '2026-09-05 18:14:24'),
+(124, 510, 'USER_BANNED', '2026-09-05 18:14:32'),
+(125, 510, 'USER_UNBANNED', '2026-09-05 18:14:37'),
+(126, 510, 'USER_BANNED', '2026-09-05 18:14:52'),
+(127, 510, 'USER_UNBANNED', '2026-09-05 18:14:53'),
+(128, 16, 'FILM_LIKED', '2026-09-05 18:15:06'),
+(129, 16, 'FILM_LIKED', '2026-09-05 18:15:06'),
+(130, 16, 'FILM_WATCHED', '2026-09-05 18:15:07'),
+(131, 16, 'FILM_UPDATED', '2026-09-05 18:17:43'),
+(132, 16, 'FILM_UPDATED', '2026-09-05 18:17:48'),
+(133, 16, 'FILM_UNLIKED', '2026-09-05 18:20:16'),
+(134, 16, 'FILM_LIKED', '2026-09-05 18:20:17'),
+(135, 16, 'FILM_DELETED', '2026-09-05 18:35:20'),
+(136, 16, 'FILM_DELETED', '2026-09-05 18:35:23'),
+(137, 16, 'LANGUAGE_CHANGED', '2026-09-05 18:35:31'),
+(138, 16, 'LANGUAGE_CHANGED', '2026-09-05 18:39:19');
 
 CREATE TABLE `user_favorites` (
   `user_id` int(11) NOT NULL,
   `film_id` int(11) NOT NULL,
   `created_at` datetime DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
---
--- Dumping data for table `user_favorites`
---
 
 INSERT INTO `user_favorites` (`user_id`, `film_id`, `created_at`) VALUES
 (1, 8, '2026-05-31 00:07:11'),
@@ -869,7 +922,6 @@ INSERT INTO `user_favorites` (`user_id`, `film_id`, `created_at`) VALUES
 (15, 10, '2026-07-10 19:18:06'),
 (15, 12, '2026-07-10 23:24:40'),
 (15, 15, '2026-07-10 19:06:13'),
-(16, 1, '2026-07-23 18:45:59'),
 (16, 2, '2026-07-18 17:50:42'),
 (16, 3, '2026-07-18 18:28:23'),
 (16, 5, '2026-07-10 20:15:20'),
@@ -890,17 +942,18 @@ INSERT INTO `user_favorites` (`user_id`, `film_id`, `created_at`) VALUES
 (16, 21, '2026-07-23 20:07:16'),
 (16, 22, '2026-07-23 20:07:16'),
 (16, 23, '2026-07-23 20:07:17'),
-(16, 24, '2026-07-23 20:07:18'),
+(16, 24, '2026-09-04 23:39:52'),
 (16, 25, '2026-07-23 20:07:18'),
 (16, 26, '2026-07-23 20:07:19'),
-(16, 27, '2026-08-14 19:36:09'),
-(16, 28, '2026-08-14 20:18:37'),
-(16, 29, '2026-07-26 00:28:59'),
-(16, 30, '2026-07-23 20:07:21'),
+(16, 27, '2026-08-30 00:12:42'),
+(16, 28, '2026-09-05 00:44:40'),
+(16, 29, '2026-08-30 17:31:21'),
+(16, 30, '2026-09-05 20:20:17'),
 (17, 2, '2026-07-11 03:03:38'),
 (17, 3, '2026-07-11 03:03:37'),
 (17, 6, '2026-07-11 03:03:42'),
 (17, 7, '2026-07-11 03:03:40'),
+(21, 29, '2026-08-30 18:32:14'),
 (22, 3, '2026-07-18 17:58:07'),
 (23, 1, '2026-07-18 18:23:39'),
 (23, 2, '2026-07-18 18:23:38'),
@@ -927,21 +980,11 @@ INSERT INTO `user_favorites` (`user_id`, `film_id`, `created_at`) VALUES
 (490, 29, '2026-08-16 18:37:48'),
 (490, 30, '2026-08-16 18:37:48');
 
--- --------------------------------------------------------
-
---
--- Struktura tabeli dla tabeli `user_watched`
---
-
 CREATE TABLE `user_watched` (
   `user_id` int(11) NOT NULL,
   `film_id` int(11) NOT NULL,
   `watched_at` datetime DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
---
--- Dumping data for table `user_watched`
---
 
 INSERT INTO `user_watched` (`user_id`, `film_id`, `watched_at`) VALUES
 (5, 3, '2026-05-31 01:41:40'),
@@ -995,17 +1038,17 @@ INSERT INTO `user_watched` (`user_id`, `film_id`, `watched_at`) VALUES
 (16, 21, '2026-07-23 20:52:42'),
 (16, 22, '2026-07-23 20:52:42'),
 (16, 23, '2026-07-23 20:52:39'),
-(16, 24, '2026-07-23 20:52:39'),
-(16, 25, '2026-07-23 20:52:40'),
+(16, 25, '2026-08-30 17:31:32'),
 (16, 26, '2026-07-23 20:52:41'),
-(16, 27, '2026-07-23 20:52:38'),
-(16, 28, '2026-07-23 20:52:37'),
-(16, 29, '2026-07-23 20:06:39'),
-(16, 30, '2026-07-23 20:52:37'),
+(16, 27, '2026-09-05 19:27:13'),
+(16, 28, '2026-08-30 17:31:31'),
+(16, 29, '2026-08-30 17:31:33'),
+(16, 30, '2026-09-05 17:04:19'),
 (17, 2, '2026-07-11 03:03:38'),
 (17, 4, '2026-07-11 03:03:39'),
 (17, 6, '2026-07-11 03:03:41'),
 (17, 7, '2026-07-11 03:03:41'),
+(21, 29, '2026-08-30 18:32:14'),
 (23, 1, '2026-07-18 18:23:28'),
 (23, 2, '2026-07-18 18:23:27'),
 (23, 3, '2026-07-18 18:23:27'),
@@ -1018,47 +1061,26 @@ INSERT INTO `user_watched` (`user_id`, `film_id`, `watched_at`) VALUES
 (490, 27, '2026-08-16 18:37:51'),
 (490, 29, '2026-08-16 18:37:50');
 
---
--- Indeksy dla zrzutów tabel
---
 
---
--- Indeksy dla tabeli `films`
---
 ALTER TABLE `films`
   ADD PRIMARY KEY (`id`);
 
---
--- Indeksy dla tabeli `film_genres`
---
 ALTER TABLE `film_genres`
   ADD PRIMARY KEY (`film_id`,`genre_id`),
   ADD KEY `genre_id` (`genre_id`);
 
---
--- Indeksy dla tabeli `film_translations`
---
 ALTER TABLE `film_translations`
   ADD PRIMARY KEY (`id`),
   ADD UNIQUE KEY `film_id` (`film_id`,`language_code`),
   ADD KEY `fk_language` (`language_code`);
 
---
--- Indeksy dla tabeli `genres`
---
 ALTER TABLE `genres`
   ADD PRIMARY KEY (`id`),
   ADD UNIQUE KEY `name` (`name`);
 
---
--- Indeksy dla tabeli `languages`
---
 ALTER TABLE `languages`
   ADD PRIMARY KEY (`code`);
 
---
--- Indeksy dla tabeli `users`
---
 ALTER TABLE `users`
   ADD PRIMARY KEY (`id`),
   ADD UNIQUE KEY `email` (`email`),
@@ -1066,103 +1088,55 @@ ALTER TABLE `users`
   ADD KEY `fk_user_banned_by` (`banned_by`),
   ADD KEY `fk_user_suspended_by` (`suspended_by`);
 
---
--- Indeksy dla tabeli `user_activity`
---
 ALTER TABLE `user_activity`
   ADD PRIMARY KEY (`id`),
   ADD KEY `user_id` (`user_id`);
 
---
--- Indeksy dla tabeli `user_favorites`
---
 ALTER TABLE `user_favorites`
   ADD PRIMARY KEY (`user_id`,`film_id`),
   ADD KEY `film_id` (`film_id`);
 
---
--- Indeksy dla tabeli `user_watched`
---
 ALTER TABLE `user_watched`
   ADD PRIMARY KEY (`user_id`,`film_id`),
   ADD KEY `film_id` (`film_id`);
 
---
--- AUTO_INCREMENT for dumped tables
---
 
---
--- AUTO_INCREMENT for table `films`
---
 ALTER TABLE `films`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=33;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=50;
 
---
--- AUTO_INCREMENT for table `film_translations`
---
 ALTER TABLE `film_translations`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=94;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=139;
 
---
--- AUTO_INCREMENT for table `genres`
---
 ALTER TABLE `genres`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=40;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=42;
 
---
--- AUTO_INCREMENT for table `users`
---
 ALTER TABLE `users`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=510;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=513;
 
---
--- AUTO_INCREMENT for table `user_activity`
---
 ALTER TABLE `user_activity`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=139;
 
---
--- Constraints for dumped tables
---
 
---
--- Constraints for table `film_genres`
---
 ALTER TABLE `film_genres`
   ADD CONSTRAINT `film_genres_ibfk_1` FOREIGN KEY (`film_id`) REFERENCES `films` (`id`) ON DELETE CASCADE,
   ADD CONSTRAINT `film_genres_ibfk_2` FOREIGN KEY (`genre_id`) REFERENCES `genres` (`id`) ON DELETE CASCADE;
 
---
--- Constraints for table `film_translations`
---
 ALTER TABLE `film_translations`
   ADD CONSTRAINT `film_translations_ibfk_1` FOREIGN KEY (`film_id`) REFERENCES `films` (`id`) ON DELETE CASCADE,
   ADD CONSTRAINT `fk_language` FOREIGN KEY (`language_code`) REFERENCES `languages` (`code`) ON UPDATE CASCADE;
 
---
--- Constraints for table `users`
---
 ALTER TABLE `users`
   ADD CONSTRAINT `fk_user_banned_by` FOREIGN KEY (`banned_by`) REFERENCES `users` (`id`) ON DELETE SET NULL,
   ADD CONSTRAINT `fk_user_language` FOREIGN KEY (`language_code`) REFERENCES `languages` (`code`),
   ADD CONSTRAINT `fk_user_suspended_by` FOREIGN KEY (`suspended_by`) REFERENCES `users` (`id`) ON DELETE SET NULL;
 
---
--- Constraints for table `user_activity`
---
 ALTER TABLE `user_activity`
   ADD CONSTRAINT `user_activity_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`);
 
---
--- Constraints for table `user_favorites`
---
 ALTER TABLE `user_favorites`
   ADD CONSTRAINT `user_favorites_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
   ADD CONSTRAINT `user_favorites_ibfk_2` FOREIGN KEY (`film_id`) REFERENCES `films` (`id`) ON DELETE CASCADE;
 
---
--- Constraints for table `user_watched`
---
 ALTER TABLE `user_watched`
   ADD CONSTRAINT `user_watched_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
   ADD CONSTRAINT `user_watched_ibfk_2` FOREIGN KEY (`film_id`) REFERENCES `films` (`id`) ON DELETE CASCADE;

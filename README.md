@@ -395,7 +395,7 @@ cp .env.example .env
 npm start
 ```
 
-The API will listen on the port defined in `process.env.PORT` (default: `3000`).
+The API will listen on the port defined in `process.env.PORT` (default: `8000`).
 
 ## 🛢 Database setup 
 1. Create a MySQL database.
@@ -410,7 +410,7 @@ The API will listen on the port defined in `process.env.PORT` (default: `3000`).
 Create a `.env` file in the project root:
 
 ```env
-PORT=3000
+PORT=8000
 
 # Database
 DB_HOST=localhost
