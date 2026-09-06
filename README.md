@@ -11,7 +11,7 @@
 
 **Express · MySQL · JWT · bcrypt · RBAC · Server-Side Pagination**
 
-[Frontend Repo](https://github.com/Dziopino/Movies-Frontend) · [Backend Repo](https://github.com/Dziopino/Movies-Backend) · [API Docs](#-api-reference)
+[Frontend Repo](https://github.com/Dziopino/Movies-Frontend) · [Backend Repo](https://github.com/Dziopino/Movies-Backend) · [Live Demo](https://cinemix.xyz) · [API Docs](#-api-reference)
 
 </div>
 
@@ -132,8 +132,8 @@ The API implements a **three-tier middleware cascade** that progressively escala
 - **File filter** rejects non-image MIME types.
 - **Size cap**: 2 MB hard limit (`MulterError` handling).
 - **sharp** resizes images:
-  - **Avatars**: 300×300 cover-fit, WebP quality 80
-  - **Film posters**: 200×285 cover-fit, WebP quality 90
+    - **Avatars**: 300×300 cover-fit, WebP quality 80
+    - **Film posters**: 200×285 cover-fit, WebP quality 90
 - **Old avatar cleanup**: On successful upload, the previous avatar file is deleted from disk to prevent storage bloat.
 - **Poster storage**: Film posters are saved to `uploads/posters/` and served via express.static middleware at `/uploads` endpoint.
 
@@ -406,10 +406,10 @@ npm start
 
 The API will listen on the port defined in `process.env.PORT` (default: `8000`).
 
-## 🛢 Database setup 
+## 🛢 Database setup
 1. Create a MySQL database.
 2. Import database/cinemix.sql.
-3. Configure database credentials in .env. 
+3. Configure database credentials in .env.
 4. Start the backend with npm run dev.
 
 ---
@@ -450,10 +450,10 @@ CORS_ORIGIN=http://localhost:5173
 **Production Deployment:**
 - Add and verify your custom domain at [resend.com/domains](https://resend.com/domains)
 - Configure DNS records at your registrar:
-  - `resend._domainkey` TXT (DKIM signature)
-  - `rsend` CNAME → `rsend-euw1.forge.rmta.net` (SPF)
-  - `send` CNAME → `send.forge.rmta.net` (SPF)
-  - `_dmarc` TXT → `v=DMARC1; p=none;`
+    - `resend._domainkey` TXT (DKIM signature)
+    - `rsend` CNAME → `rsend-euw1.forge.rmta.net` (SPF)
+    - `send` CNAME → `send.forge.rmta.net` (SPF)
+    - `_dmarc` TXT → `v=DMARC1; p=none;`
 - Update `from` address in code to use your domain (e.g., `noreply@yourdomain.com`)
 - Resend free tier: 100 emails/day, 3000/month
 
