@@ -65,10 +65,16 @@ This repository is designed to pair with the [Movies-Frontend](https://github.co
 | **bcrypt** | ^6.0.0 | Secure password hashing (salted) |
 | **multer** | ^2.2.0 | In-memory multipart upload handling |
 | **sharp** | ^0.35.2 | High-performance image processing (WebP compression) |
-| **resend** | ^3.x | HTTPS-based transactional email API (replaces SMTP) |
+| **resend** | ^6.26.0 | HTTPS-based transactional email API (replaces SMTP) |
+| **helmet** | ^8.3.0 | HTTP security headers (CSP, HSTS, X-Frame-Options) |
+| **express-rate-limit** | ^8.7.0 | API rate limiting (global: 750 req/15min, auth: 10 req/15min) |
 | **crypto** | ^1.0.1 | Cryptographic token generation (password reset) |
 | **dotenv** | ^17.4.2 | Environment variable management |
 | **cors** | ^2.8.6 | Cross-Origin Resource Sharing policy |
+| **cookie-parser** | ~1.4.4 | Cookie parsing middleware |
+| **morgan** | ~1.9.1 | HTTP request logging |
+| **vitest** | ^4.1.10 | Unit/integration testing framework (dev) |
+| **supertest** | ^7.2.2 | HTTP assertion library for API testing (dev) |
 
 ---
 
@@ -203,6 +209,7 @@ SUSPENDED ──unsuspend()──► ACTIVE    │
 | `hashPassword` | `utils/passwordHasher.js` | bcrypt wrapper with adaptive salt rounds. |
 | `isPasswordValid` | `utils/passwordValidator.js` | Enforces complexity: ≥8 chars, uppercase, lowercase, digit, special character. |
 | `loadLanguages` / `isLanguageValid` | `utils/languageValidator.js` | Caches language codes at boot time to avoid repeated DB hits. |
+| `logActivity` | `utils/activityLogger.js` | Logs user/admin actions to `user_activity` table for audit trail. |
 
 ---
 
@@ -212,21 +219,22 @@ SUSPENDED ──unsuspend()──► ACTIVE    │
 
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
-| `POST` | `/checkLoginData` | — | Authenticate; returns JWT + user object. Handles BANNED / SUSPENDED states with auto-expiry logic. |
-| `POST` | `/addUser` | — | Register new account. Validates password complexity, hashes with bcrypt, rejects duplicate emails. |
-| `POST` | `/requestPasswordReset` | — | Generates crypto token, stores expiry, sends reset email via Resend API (HTTPS). Non-blocking: responds immediately even if email fails. |
-| `GET` | `/getResetToken/:token` | — | Verifies token existence and expiry status. |
-| `POST` | `/resetPassword/:token` | — | Validates token, hashes new password, nullifies token. |
+| `POST` | `/api/checkLoginData` | — | Authenticate; returns JWT + user object. Handles BANNED / SUSPENDED states with auto-expiry logic. |
+| `POST` | `/api/addUser` | — | Register new account. Validates password complexity, hashes with bcrypt, rejects duplicate emails. |
+| `POST` | `/api/requestPasswordReset` | — | Generates crypto token, stores expiry, sends reset email via Resend API (HTTPS). Non-blocking: responds immediately even if email fails. |
+| `GET` | `/api/getResetToken/:token` | — | Verifies token existence and expiry status. |
+| `POST` | `/api/resetPassword/:token` | — | Validates token, hashes new password, nullifies token. |
 
 ### User Profile
 
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
-| `POST` | `/getUserData` | JWT | Returns sanitized user profile (excludes password hash). |
-| `POST` | `/editUserBio` | JWT | Updates biography text. |
-| `POST` | `/editUserName` | JWT | Updates display name. |
-| `POST` | `/changeUserLanguage` | JWT | Updates preferred UI locale; validated against cached language codes. |
-| `POST` | `/uploadAvatar` | JWT + multer | Accepts image ≤2 MB; compresses to 300×300 WebP; replaces old file. |
+| `POST` | `/api/getUserData` | JWT | Returns sanitized user profile (excludes password hash). |
+| `POST` | `/api/getUserActivity` | JWT | Returns the user's latest activity events (login, avatar update, like, watch, language change) from `user_activity` table. |
+| `POST` | `/api/editUserBio` | JWT | Updates biography text. |
+| `POST` | `/api/editUserName` | JWT | Updates display name. |
+| `POST` | `/api/changeUserLanguage` | JWT | Updates preferred UI locale; validated against cached language codes. |
+| `POST` | `/api/uploadAvatar` | JWT + multer | Accepts image ≤2 MB; compresses to 300×300 WebP; replaces old file. |
 
 ### Film Catalog (Public)
 
@@ -295,7 +303,10 @@ SUSPENDED ──unsuspend()──► ACTIVE    │
 ## ✨ Key Features
 
 ### Server-Side Pagination & Search
-All list endpoints (`getFilms`, `getUsers`, `getGenres`, `likedGet`, `watchedGet`) implement consistent pagination via `LIMIT`/`OFFSET` with parallel `COUNT(*)` queries for total page calculation. Search is delegated to SQL `LIKE` with parameterized values, preventing unbounded result sets from reaching the client.
+All list endpoints (`getFilms`, `getUsers`, `getGenres`, `likedGet`, `watchedGet`, `audit-logs`) implement consistent pagination via `LIMIT`/`OFFSET` with parallel `COUNT(*)` queries for total page calculation. Search is delegated to SQL `LIKE` with parameterized values, preventing unbounded result sets from reaching the client.
+
+### Activity Logging Architecture
+Comprehensive audit trail implemented via `user_activity` table capturing 25+ distinct action types (e.g., `FILM_LIKED`, `USER_LOGGED_IN`, `USER_BANNED`) with associated `user_id` and timestamp. Used by both user profile history and admin dashboard analytics. Includes a dedicated endpoint for paginated and filterable administrative review.
 
 ### Auto-Expiry Suspension Engine
 Suspended accounts do not require manual intervention to reactivate. The expiry is evaluated in two places:
@@ -313,20 +324,25 @@ Early iterations used `INNER JOIN` when resolving film-genre relationships, whic
 ## 📁 Project Structure
 
 ```
-Movies-Backend/
+backend/
 ├── bin/
 │   └── www                     # Server bootstrap (port binding)
+├── controllers/                # Request handlers (analytics)
+│   └── analyticsController.js  # Dashboard analytics endpoints
 ├── middleware/
 │   ├── authMiddleware.js       # JWT validation + status reconciliation
 │   ├── adminMiddleware.js      # Role-based access enforcement
 │   └── optionalAuthMiddleware.js # Guest-friendly auth parsing
 ├── utils/
+│   ├── activityLogger.js       # User activity logging for audit trail
 │   ├── checkIfUserIsAdmin.js   # Async role verification
 │   ├── generateToken.js        # JWT signing utility
 │   ├── languageValidator.js    # Language cache + validation
 │   ├── passwordHasher.js       # bcrypt hashing wrapper
 │   └── passwordValidator.js    # Complexity rule engine
-├── public/                     # Static assets (avatars, uploads)
+├── database/
+│   └── cinemix.sql             # Database schema
+├── public/                     # Static assets (legacy)
 ├── uploads/                    # Processed WebP avatars and film posters
 │   ├── [avatars].webp         # User profile pictures (300×300)
 │   └── posters/               # Film posters (200×285)
@@ -339,7 +355,7 @@ Movies-Backend/
 └── .env                        # Environment configuration (not tracked)
 ```
 
-> **Note:** The current architecture consolidates all route handlers in `server.js`. A controller-based refactor is scheduled on the [Roadmap](#-roadmap) to improve maintainability at scale.
+> **Note:** The current architecture consolidates most route handlers in `server.js`. Analytics endpoints are extracted to `controllers/analyticsController.js`. A full controller-based refactor is scheduled on the [Roadmap](#-roadmap) to improve maintainability at scale.
 
 ---
 

@@ -239,7 +239,7 @@ app.post('/api/getFilms', optionalAuthMiddleware, (req, res) => {
     }
 
 
-    connection.query(`SELECT films.id, films.poster_url, films.rating, films.release_date, films.duration,film_translations.title, film_translations.description, user_favorites.film_id, user_watched.film_id AS watchedFilmId FROM films INNER JOIN film_translations ON films.id = film_translations.film_id LEFT JOIN user_favorites ON films.id = user_favorites.film_id AND user_favorites.user_id = ? LEFT JOIN user_watched ON films.id = user_watched.film_id AND user_watched.user_id = ? WHERE film_translations.language_code = ? ${searchQuery} ORDER BY films.id DESC LIMIT ? OFFSET ?`, search ? [userId, userId, language, `%${search}%`, limit, offset] : [userId, userId, language, limit, offset], (err,result)=>{
+    connection.query(`SELECT films.id, films.poster_url, films.rating, films.release_date, films.duration,film_translations.title, film_translations.description, GROUP_CONCAT(DISTINCT genres.name ORDER BY genres.name SEPARATOR ', ') AS genres, user_favorites.film_id, user_watched.film_id AS watchedFilmId FROM films INNER JOIN film_translations ON films.id = film_translations.film_id LEFT JOIN film_genres ON films.id = film_genres.film_id LEFT JOIN genres ON genres.id = film_genres.genre_id LEFT JOIN user_favorites ON films.id = user_favorites.film_id AND user_favorites.user_id = ? LEFT JOIN user_watched ON films.id = user_watched.film_id AND user_watched.user_id = ? WHERE film_translations.language_code = ? ${searchQuery} GROUP BY films.id, films.poster_url, films.rating, films.release_date, films.duration, film_translations.title, film_translations.description, user_favorites.film_id, user_watched.film_id ORDER BY films.id DESC LIMIT ? OFFSET ?`, search ? [userId, userId, language, `%${search}%`, limit, offset] : [userId, userId, language, limit, offset], (err,result)=>{
 
             if(err){
                 console.log(err);
@@ -359,7 +359,7 @@ app.post("/api/likedGet", authMiddleware, (req, res) => {
         searchQuery = "AND film_translations.title LIKE ?";
     }
 
-    connection.query(`SELECT films.id, films.poster_url, films.rating, films.release_date, films.duration,film_translations.title, film_translations.description, user_favorites.film_id, user_watched.film_id AS watchedFilmId FROM user_favorites INNER JOIN films  ON user_favorites.film_id = films.id INNER JOIN film_translations ON films.id = film_translations.film_id LEFT JOIN user_watched ON films.id = user_watched.film_id AND user_watched.user_id = user_favorites.user_id WHERE user_favorites.user_id = ? AND film_translations.language_code = ( SELECT language_code FROM users  WHERE id = ?) ${searchQuery} ORDER BY user_favorites.created_at DESC LIMIT ? OFFSET ?`, search ? [userId, userId, `%${search}%`, limit, offset] : [userId, userId, limit, offset], (err,result)=>{
+    connection.query(`SELECT films.id, films.poster_url, films.rating, films.release_date, films.duration,film_translations.title, film_translations.description, GROUP_CONCAT(DISTINCT genres.name ORDER BY genres.name SEPARATOR ', ') AS genres, user_favorites.film_id, user_watched.film_id AS watchedFilmId FROM user_favorites INNER JOIN films  ON user_favorites.film_id = films.id INNER JOIN film_translations ON films.id = film_translations.film_id LEFT JOIN film_genres ON films.id = film_genres.film_id LEFT JOIN genres ON genres.id = film_genres.genre_id LEFT JOIN user_watched ON films.id = user_watched.film_id AND user_watched.user_id = user_favorites.user_id WHERE user_favorites.user_id = ? AND film_translations.language_code = ( SELECT language_code FROM users  WHERE id = ?) ${searchQuery} GROUP BY films.id, films.poster_url, films.rating, films.release_date, films.duration, film_translations.title, film_translations.description, user_favorites.film_id, user_watched.film_id, user_favorites.created_at ORDER BY user_favorites.created_at DESC LIMIT ? OFFSET ?`, search ? [userId, userId, `%${search}%`, limit, offset] : [userId, userId, limit, offset], (err,result)=>{
 
             if(err){
                 console.log(err);
@@ -389,7 +389,7 @@ app.post("/api/watchedGet",authMiddleware, (req, res) => {
         searchQuery = "AND film_translations.title LIKE ?";
     }
 
-    connection.query(`SELECT films.id, films.poster_url, films.rating, films.release_date, films.duration,film_translations.title, film_translations.description, user_favorites.film_id, user_watched.film_id AS watchedFilmId FROM user_favorites INNER JOIN films  ON user_favorites.film_id = films.id INNER JOIN film_translations ON films.id = film_translations.film_id LEFT JOIN user_watched ON films.id = user_watched.film_id AND user_watched.user_id = user_favorites.user_id WHERE user_watched.user_id = ? AND film_translations.language_code = ( SELECT language_code FROM users  WHERE id = ?) ${searchQuery} ORDER BY user_favorites.created_at DESC LIMIT ? OFFSET ?`, search ? [userId, userId, `%${search}%`, limit, offset] : [userId, userId, limit, offset], (err,result)=>{
+    connection.query(`SELECT films.id, films.poster_url, films.rating, films.release_date, films.duration,film_translations.title, film_translations.description, GROUP_CONCAT(DISTINCT genres.name ORDER BY genres.name SEPARATOR ', ') AS genres, user_favorites.film_id, user_watched.film_id AS watchedFilmId FROM user_watched INNER JOIN films  ON user_watched.film_id = films.id INNER JOIN film_translations ON films.id = film_translations.film_id LEFT JOIN film_genres ON films.id = film_genres.film_id LEFT JOIN genres ON genres.id = film_genres.genre_id LEFT JOIN user_favorites ON films.id = user_favorites.film_id AND user_favorites.user_id = user_watched.user_id WHERE user_watched.user_id = ? AND film_translations.language_code = ( SELECT language_code FROM users  WHERE id = ?) ${searchQuery} GROUP BY films.id, films.poster_url, films.rating, films.release_date, films.duration, film_translations.title, film_translations.description, user_favorites.film_id, user_watched.film_id, user_watched.watched_at ORDER BY user_watched.watched_at DESC LIMIT ? OFFSET ?`, search ? [userId, userId, `%${search}%`, limit, offset] : [userId, userId, limit, offset], (err,result)=>{
 
         if(err){
             console.log(err);
@@ -418,6 +418,21 @@ app.post("/api/getUserData", authMiddleware, (req, res) => {
             return res.json({message:"User data got successfully",body:result[0]});
         }
     })
+})
+
+app.post("/api/getUserActivity", authMiddleware, (req, res) => {
+    const userId = req.user.id;
+
+    connection.query(
+        "SELECT action, MAX(created_at) AS created_at FROM user_activity WHERE user_id = ? AND action IN ('USER_LOGGED_IN','AVATAR_UPDATED','FILM_LIKED','FILM_WATCHED','LANGUAGE_CHANGED') GROUP BY action ORDER BY created_at DESC",
+        [userId],
+        (err, result) => {
+            if (err) {
+                return res.json({message: "Error while getting user activity"});
+            }
+            return res.json({message:"User activity got successfully",body:result});
+        }
+    )
 })
 
 app.get("/api/getLanguageCodes", (req, res) => {
