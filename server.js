@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -21,7 +22,7 @@ const adminMiddleware = require("./middleware/adminMiddleware");
 const {loadLanguages, isLanguageValid} = require("./utils/languageValidator");
 const checkIfUserIsAdmin = require("./utils/checkIfUserIsAdmin");
 const logActivity = require("./utils/activityLogger");
-require('dotenv').config();
+const { uploadToCloudinary, deleteFromCloudinary } = require("./utils/cloudinary");
 
 const corsOptions = {
     origin: process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',') : 'http://localhost:5173',
@@ -32,8 +33,6 @@ const corsOptions = {
 app.use(cors(corsOptions));
 
 app.use(express.json());
-
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 app.use(helmet({
     crossOriginResourcePolicy: { policy: "cross-origin" }
@@ -227,11 +226,22 @@ app.post('/api/getFilms', optionalAuthMiddleware, (req, res) => {
     const limit = 20;
     const offset = (page - 1) * limit;
     const search = req.body.search || "";
+    const genreName = req.body.genreName || null;
 
     let searchQuery = "";
+    let genreQuery = "";
+    const params = [userId, userId, language];
+    const countParams = [language];
 
     if(search){
         searchQuery = "AND film_translations.title LIKE ?";
+        params.push(`%${search}%`);
+        countParams.push(`%${search}%`);
+    }
+
+    if(genreName){
+        genreQuery = "HAVING FIND_IN_SET(?, GROUP_CONCAT(DISTINCT genres.name)) > 0";
+        params.splice(params.length - (search ? 1 : 0), 0, genreName);
     }
 
     if (!isLanguageValid(language)) {
@@ -239,14 +249,17 @@ app.post('/api/getFilms', optionalAuthMiddleware, (req, res) => {
     }
 
 
-    connection.query(`SELECT films.id, films.poster_url, films.rating, films.release_date, films.duration,film_translations.title, film_translations.description, GROUP_CONCAT(DISTINCT genres.name ORDER BY genres.name SEPARATOR ', ') AS genres, user_favorites.film_id, user_watched.film_id AS watchedFilmId FROM films INNER JOIN film_translations ON films.id = film_translations.film_id LEFT JOIN film_genres ON films.id = film_genres.film_id LEFT JOIN genres ON genres.id = film_genres.genre_id LEFT JOIN user_favorites ON films.id = user_favorites.film_id AND user_favorites.user_id = ? LEFT JOIN user_watched ON films.id = user_watched.film_id AND user_watched.user_id = ? WHERE film_translations.language_code = ? ${searchQuery} GROUP BY films.id, films.poster_url, films.rating, films.release_date, films.duration, film_translations.title, film_translations.description, user_favorites.film_id, user_watched.film_id ORDER BY films.id DESC LIMIT ? OFFSET ?`, search ? [userId, userId, language, `%${search}%`, limit, offset] : [userId, userId, language, limit, offset], (err,result)=>{
+    connection.query(`SELECT films.id, films.poster_url, films.rating, films.release_date, films.duration,film_translations.title, film_translations.description, GROUP_CONCAT(DISTINCT genres.name ORDER BY genres.name SEPARATOR ', ') AS genres, user_favorites.film_id, user_watched.film_id AS watchedFilmId FROM films INNER JOIN film_translations ON films.id = film_translations.film_id LEFT JOIN film_genres ON films.id = film_genres.film_id LEFT JOIN genres ON genres.id = film_genres.genre_id LEFT JOIN user_favorites ON films.id = user_favorites.film_id AND user_favorites.user_id = ? LEFT JOIN user_watched ON films.id = user_watched.film_id AND user_watched.user_id = ? WHERE film_translations.language_code = ? ${searchQuery} GROUP BY films.id, films.poster_url, films.rating, films.release_date, films.duration, film_translations.title, film_translations.description, user_favorites.film_id, user_watched.film_id ${genreQuery} ORDER BY films.id DESC LIMIT ? OFFSET ?`, [...params, limit, offset], (err,result)=>{
 
             if(err){
                 console.log(err);
                 return res.json({message:"Error getting films"});
             }
 
-            connection.query(`SELECT COUNT(*) AS count FROM films INNER JOIN film_translations ON films.id = film_translations.film_id WHERE film_translations.language_code = ? ${searchQuery}`,  search  ? [language, `%${search}%`]  : [language],  (err,count)=>{
+            const countGenreQuery = genreName ? "INNER JOIN film_genres ON films.id = film_genres.film_id INNER JOIN genres ON genres.id = film_genres.genre_id WHERE film_translations.language_code = ? " + searchQuery + " AND genres.name = ?" : "WHERE film_translations.language_code = ? " + searchQuery;
+            const finalCountParams = genreName ? [...countParams, genreName] : countParams;
+
+            connection.query(`SELECT COUNT(DISTINCT films.id) AS count FROM films INNER JOIN film_translations ON films.id = film_translations.film_id ${countGenreQuery}`,  finalCountParams,  (err,count)=>{
 
                     if(err){
                         console.log(err);
@@ -353,20 +366,35 @@ app.post("/api/likedGet", authMiddleware, (req, res) => {
     const limit = 20;
     const offset = (page - 1) * limit;
     const search = req.body.search || "";
+    const genreName = req.body.genreName || null;
     let searchQuery = "";
+    let genreQuery = "";
+    const params = [userId, userId];
+    const countParams = [userId, userId];
 
     if(search){
         searchQuery = "AND film_translations.title LIKE ?";
+        params.push(`%${search}%`);
+        countParams.push(`%${search}%`);
     }
 
-    connection.query(`SELECT films.id, films.poster_url, films.rating, films.release_date, films.duration,film_translations.title, film_translations.description, GROUP_CONCAT(DISTINCT genres.name ORDER BY genres.name SEPARATOR ', ') AS genres, user_favorites.film_id, user_watched.film_id AS watchedFilmId FROM user_favorites INNER JOIN films  ON user_favorites.film_id = films.id INNER JOIN film_translations ON films.id = film_translations.film_id LEFT JOIN film_genres ON films.id = film_genres.film_id LEFT JOIN genres ON genres.id = film_genres.genre_id LEFT JOIN user_watched ON films.id = user_watched.film_id AND user_watched.user_id = user_favorites.user_id WHERE user_favorites.user_id = ? AND film_translations.language_code = ( SELECT language_code FROM users  WHERE id = ?) ${searchQuery} GROUP BY films.id, films.poster_url, films.rating, films.release_date, films.duration, film_translations.title, film_translations.description, user_favorites.film_id, user_watched.film_id, user_favorites.created_at ORDER BY user_favorites.created_at DESC LIMIT ? OFFSET ?`, search ? [userId, userId, `%${search}%`, limit, offset] : [userId, userId, limit, offset], (err,result)=>{
+    if(genreName){
+        genreQuery = "HAVING FIND_IN_SET(?, GROUP_CONCAT(DISTINCT genres.name)) > 0";
+        params.splice(params.length - (search ? 1 : 0), 0, genreName);
+    }
+
+    connection.query(`SELECT films.id, films.poster_url, films.rating, films.release_date, films.duration,film_translations.title, film_translations.description, GROUP_CONCAT(DISTINCT genres.name ORDER BY genres.name SEPARATOR ', ') AS genres, user_favorites.film_id, user_watched.film_id AS watchedFilmId FROM user_favorites INNER JOIN films  ON user_favorites.film_id = films.id INNER JOIN film_translations ON films.id = film_translations.film_id LEFT JOIN film_genres ON films.id = film_genres.film_id LEFT JOIN genres ON genres.id = film_genres.genre_id LEFT JOIN user_watched ON films.id = user_watched.film_id AND user_watched.user_id = user_favorites.user_id WHERE user_favorites.user_id = ? AND film_translations.language_code = ( SELECT language_code FROM users  WHERE id = ?) ${searchQuery} GROUP BY films.id, films.poster_url, films.rating, films.release_date, films.duration, film_translations.title, film_translations.description, user_favorites.film_id, user_watched.film_id, user_favorites.created_at ${genreQuery} ORDER BY user_favorites.created_at DESC LIMIT ? OFFSET ?`, [...params, limit, offset], (err,result)=>{
 
             if(err){
                 console.log(err);
                 return res.json({message:"Error while getting favorites",success:false});
             }
 
-            connection.query(`SELECT COUNT(*) AS count FROM user_favorites INNER JOIN films ON user_favorites.film_id = films.id INNER JOIN film_translations ON films.id = film_translations.film_id WHERE user_favorites.user_id = ? AND film_translations.language_code = ( SELECT language_code  FROM users  WHERE id = ?) ${searchQuery}`, search  ?  [userId, userId, `%${search}%`]  :  [userId, userId], (err,count)=>{
+            const countGenreJoin = genreName ? " INNER JOIN film_genres ON films.id = film_genres.film_id INNER JOIN genres ON genres.id = film_genres.genre_id" : "";
+            const countGenreWhere = genreName ? " AND genres.name = ?" : "";
+            const finalCountParams = genreName ? [...countParams, genreName] : countParams;
+
+            connection.query(`SELECT COUNT(DISTINCT films.id) AS count FROM user_favorites INNER JOIN films ON user_favorites.film_id = films.id INNER JOIN film_translations ON films.id = film_translations.film_id${countGenreJoin} WHERE user_favorites.user_id = ? AND film_translations.language_code = ( SELECT language_code  FROM users  WHERE id = ?) ${searchQuery}${countGenreWhere}`, finalCountParams, (err,count)=>{
 
                     if(err){
                         console.log(err);
@@ -383,20 +411,35 @@ app.post("/api/watchedGet",authMiddleware, (req, res) => {
     const limit = 20;
     const offset = (page - 1) * limit;
     const search = req.body.search || "";
+    const genreName = req.body.genreName || null;
     let searchQuery = "";
+    let genreQuery = "";
+    const params = [userId, userId];
+    const countParams = [userId, userId];
 
     if(search){
         searchQuery = "AND film_translations.title LIKE ?";
+        params.push(`%${search}%`);
+        countParams.push(`%${search}%`);
     }
 
-    connection.query(`SELECT films.id, films.poster_url, films.rating, films.release_date, films.duration,film_translations.title, film_translations.description, GROUP_CONCAT(DISTINCT genres.name ORDER BY genres.name SEPARATOR ', ') AS genres, user_favorites.film_id, user_watched.film_id AS watchedFilmId FROM user_watched INNER JOIN films  ON user_watched.film_id = films.id INNER JOIN film_translations ON films.id = film_translations.film_id LEFT JOIN film_genres ON films.id = film_genres.film_id LEFT JOIN genres ON genres.id = film_genres.genre_id LEFT JOIN user_favorites ON films.id = user_favorites.film_id AND user_favorites.user_id = user_watched.user_id WHERE user_watched.user_id = ? AND film_translations.language_code = ( SELECT language_code FROM users  WHERE id = ?) ${searchQuery} GROUP BY films.id, films.poster_url, films.rating, films.release_date, films.duration, film_translations.title, film_translations.description, user_favorites.film_id, user_watched.film_id, user_watched.watched_at ORDER BY user_watched.watched_at DESC LIMIT ? OFFSET ?`, search ? [userId, userId, `%${search}%`, limit, offset] : [userId, userId, limit, offset], (err,result)=>{
+    if(genreName){
+        genreQuery = "HAVING FIND_IN_SET(?, GROUP_CONCAT(DISTINCT genres.name)) > 0";
+        params.splice(params.length - (search ? 1 : 0), 0, genreName);
+    }
+
+    connection.query(`SELECT films.id, films.poster_url, films.rating, films.release_date, films.duration,film_translations.title, film_translations.description, GROUP_CONCAT(DISTINCT genres.name ORDER BY genres.name SEPARATOR ', ') AS genres, user_favorites.film_id, user_watched.film_id AS watchedFilmId FROM user_watched INNER JOIN films  ON user_watched.film_id = films.id INNER JOIN film_translations ON films.id = film_translations.film_id LEFT JOIN film_genres ON films.id = film_genres.film_id LEFT JOIN genres ON genres.id = film_genres.genre_id LEFT JOIN user_favorites ON films.id = user_favorites.film_id AND user_favorites.user_id = user_watched.user_id WHERE user_watched.user_id = ? AND film_translations.language_code = ( SELECT language_code FROM users  WHERE id = ?) ${searchQuery} GROUP BY films.id, films.poster_url, films.rating, films.release_date, films.duration, film_translations.title, film_translations.description, user_favorites.film_id, user_watched.film_id, user_watched.watched_at ${genreQuery} ORDER BY user_watched.watched_at DESC LIMIT ? OFFSET ?`, [...params, limit, offset], (err,result)=>{
 
         if(err){
             console.log(err);
             return res.json({message:"Error while getting watched", success:false});
         }
 
-        connection.query(`SELECT COUNT(*) AS count FROM user_watched INNER JOIN films ON user_watched.film_id = films.id INNER JOIN film_translations ON films.id = film_translations.film_id WHERE user_watched.user_id = ? AND film_translations.language_code = ( SELECT language_code  FROM users  WHERE id = ?) ${searchQuery}`, search  ?  [userId, userId, `%${search}%`]  :  [userId, userId], (err,count)=>{
+        const countGenreJoin = genreName ? " INNER JOIN film_genres ON films.id = film_genres.film_id INNER JOIN genres ON genres.id = film_genres.genre_id" : "";
+        const countGenreWhere = genreName ? " AND genres.name = ?" : "";
+        const finalCountParams = genreName ? [...countParams, genreName] : countParams;
+
+        connection.query(`SELECT COUNT(DISTINCT films.id) AS count FROM user_watched INNER JOIN films ON user_watched.film_id = films.id INNER JOIN film_translations ON films.id = film_translations.film_id${countGenreJoin} WHERE user_watched.user_id = ? AND film_translations.language_code = ( SELECT language_code  FROM users  WHERE id = ?) ${searchQuery}${countGenreWhere}`, finalCountParams, (err,count)=>{
 
             if(err){
                 console.log(err);
@@ -537,45 +580,26 @@ app.post("/api/uploadAvatar", authMiddleware, upload.single("avatar"), async (re
         return res.json({ message: "No file uploaded" });
     }
 
-
-
-    const fileName = crypto.randomBytes(16).toString("hex") + ".webp";
-    const outputPath = path.join(__dirname, "uploads", fileName);
-
     try {
-
-        await sharp(req.file.buffer)
+        const processedBuffer = await sharp(req.file.buffer)
             .resize(300, 300, { fit: "cover" })
             .webp({ quality: 80 })
-            .toFile(outputPath);
+            .toBuffer();
 
+        const publicId = crypto.randomBytes(16).toString("hex");
+        const result = await uploadToCloudinary(processedBuffer, "cinemix/avatars", publicId);
+        const newAvatarUrl = result.secure_url;
 
-        const newAvatarUrl = "/uploads/" + fileName;
-
-
-        connection.query("SELECT avatar_url FROM users WHERE id = ?", [userId], async (err, result) => {
+        connection.query("SELECT avatar_url FROM users WHERE id = ?", [userId], async (err, queryResult) => {
 
                 if (err) {
                     return res.json({message:"Database error"});
                 }
 
-                const oldAvatar = result[0]?.avatar_url;
+                const oldAvatar = queryResult[0]?.avatar_url;
 
-                if(oldAvatar && oldAvatar.startsWith("/uploads/")) {
-
-                    const oldPath = path.join(
-                        __dirname,
-                        oldAvatar
-                    );
-
-                    try {
-                        await fs.unlink(oldPath);
-                    }
-                    catch(err) {
-                        if (err.code !== "ENOENT") {
-                            console.error("Error deleting old avatar:", err);
-                        }
-                    }
+                if(oldAvatar) {
+                    await deleteFromCloudinary(oldAvatar);
                 }
 
 
@@ -604,13 +628,6 @@ app.post("/api/uploadAvatar", authMiddleware, upload.single("avatar"), async (re
         res.json({message:"Image processing failed", error:err.message});
     }
 
-});
-app.use("/uploads", express.static(path.join(__dirname, "uploads")));
-
-// Ensure uploads directories exist
-const uploadsDir = path.join(__dirname, "uploads", "posters");
-fs.mkdir(uploadsDir, { recursive: true }).catch(err => {
-    console.error("Error creating uploads directory:", err);
 });
 
 app.get("/api/getFilm/:id", optionalAuthMiddleware, (req, res) => {
@@ -1334,22 +1351,36 @@ app.post("/api/deleteFilm", authMiddleware, adminMiddleware, (req,res)=>{
                     return res.json({success:false, message:"invalid_password"});
                 }
 
-                connection.query("DELETE FROM films WHERE id = ?;", [filmId], async (err,result)=>{
+                connection.query("SELECT poster_url FROM films WHERE id = ?", [filmId], async (err2, filmResult) => {
 
-                        if(err){
+                        if(err2){
                             return res.status(500).json({success:false, message:"database_error"});
                         }
-                        if(result.affectedRows === 0){
-                            return res.json({success:false, message:"film_not_found"});
-                        }
 
-                        try {
-                            await logActivity(adminId, 'FILM_DELETED');
-                        } catch (logErr) {
-                            console.error('Failed to log FILM_DELETED activity:', logErr);
-                        }
+                        const posterUrl = filmResult[0]?.poster_url;
 
-                        return res.json({success:true, message:"film_deleted_successfully"});
+                        connection.query("DELETE FROM films WHERE id = ?;", [filmId], async (err,result)=>{
+
+                                if(err){
+                                    return res.status(500).json({success:false, message:"database_error"});
+                                }
+                                if(result.affectedRows === 0){
+                                    return res.json({success:false, message:"film_not_found"});
+                                }
+
+                                if(posterUrl) {
+                                    await deleteFromCloudinary(posterUrl);
+                                }
+
+                                try {
+                                    await logActivity(adminId, 'FILM_DELETED');
+                                } catch (logErr) {
+                                    console.error('Failed to log FILM_DELETED activity:', logErr);
+                                }
+
+                                return res.json({success:true, message:"film_deleted_successfully"});
+                            }
+                        );
                     }
                 );
             });
@@ -1407,27 +1438,27 @@ app.post("/api/addFilm", authMiddleware, adminMiddleware, upload.single('poster'
 
     try {
         const timestamp = Date.now();
-        const fileName = `poster_${timestamp}.webp`;
-        const outputPath = path.join(__dirname, "uploads", "posters", fileName);
+        const publicId = `poster_${timestamp}`;
 
-        await sharp(req.file.buffer)
+        const processedBuffer = await sharp(req.file.buffer)
             .resize(200, 285, {
                 fit: 'cover',
                 position: 'center'
             })
             .webp({ quality: 90 })
-            .toFile(outputPath);
+            .toBuffer();
 
-        const posterUrl = `/uploads/posters/${fileName}`;
+        const result = await uploadToCloudinary(processedBuffer, "cinemix/posters", publicId);
+        const posterUrl = result.secure_url;
 
-        connection.query("INSERT INTO films (poster_url, rating, release_date, duration) VALUES (?, ?, ?, ?)", [posterUrl, parsedRating, release_date, parsedDuration], (err, result) => {
+        connection.query("INSERT INTO films (poster_url, rating, release_date, duration) VALUES (?, ?, ?, ?)", [posterUrl, parsedRating, release_date, parsedDuration], (err, insertResult) => {
             if (err) {
                 console.error(err);
-                fs.unlink(outputPath).catch(unlinkErr => console.error("Error deleting file:", unlinkErr));
+                deleteFromCloudinary(posterUrl).catch(unlinkErr => console.error("Error deleting from Cloudinary:", unlinkErr));
                 return res.status(500).json({ success: false, message: "database_error" });
             }
 
-            const filmId = result.insertId;
+            const filmId = insertResult.insertId;
             let completedTranslations = 0;
             let completedGenres = 0;
             let hasError = false;
@@ -1436,7 +1467,7 @@ app.post("/api/addFilm", authMiddleware, adminMiddleware, upload.single('poster'
             const totalInserts = totalTranslations + totalGenres;
             if (totalInserts === 0) {
                 connection.query("DELETE FROM films WHERE id = ?", [filmId]);
-                fs.unlink(outputPath).catch(unlinkErr => console.error("Error deleting file:", unlinkErr));
+                deleteFromCloudinary(posterUrl).catch(unlinkErr => console.error("Error deleting from Cloudinary:", unlinkErr));
                 return res.status(500).json({ success: false, message: "no_data_to_insert" });
             }
 
@@ -1446,7 +1477,7 @@ app.post("/api/addFilm", authMiddleware, adminMiddleware, upload.single('poster'
                             hasError = true;
                             console.error(err);
                             connection.query("DELETE FROM films WHERE id = ?", [filmId]);
-                            fs.unlink(outputPath).catch(unlinkErr => console.error("Error deleting file:", unlinkErr));
+                            deleteFromCloudinary(posterUrl).catch(unlinkErr => console.error("Error deleting from Cloudinary:", unlinkErr));
                             return res.status(500).json({ success: false, message: "database_error" });
                         }
                         completedTranslations++;
@@ -1468,7 +1499,7 @@ app.post("/api/addFilm", authMiddleware, adminMiddleware, upload.single('poster'
                                     hasError = true;
                                     console.error(err);
                                     connection.query("DELETE FROM films WHERE id = ?", [filmId]);
-                                    fs.unlink(outputPath).catch(unlinkErr => console.error("Error deleting file:", unlinkErr));
+                                    deleteFromCloudinary(posterUrl).catch(unlinkErr => console.error("Error deleting from Cloudinary:", unlinkErr));
                                     return res.status(500).json({ success: false, message: "database_error" });
                                 }
                                 completedGenres++;
@@ -1594,22 +1625,31 @@ app.put("/api/updateFilm/:id", authMiddleware, adminMiddleware, upload.single('p
 
             try {
                 let posterUrl = null;
-                let outputPath = null;
+                let cloudinaryPublicId = null;
+                let oldPosterUrl = null;
 
                 if (req.file) {
-                    const timestamp = Date.now();
-                    const fileName = `poster_${timestamp}.webp`;
-                    outputPath = path.join(__dirname, "uploads", "posters", fileName);
+                    const oldFilmResult = await new Promise((resolve, reject) => {
+                        conn.query("SELECT poster_url FROM films WHERE id = ?", [filmId], (err, rows) => {
+                            if (err) reject(err);
+                            else resolve(rows);
+                        });
+                    });
+                    oldPosterUrl = oldFilmResult[0]?.poster_url;
 
-                    await sharp(req.file.buffer)
+                    const timestamp = Date.now();
+                    cloudinaryPublicId = `poster_${timestamp}`;
+
+                    const processedBuffer = await sharp(req.file.buffer)
                         .resize(200, 285, {
                             fit: 'cover',
                             position: 'center'
                         })
                         .webp({ quality: 90 })
-                        .toFile(outputPath);
+                        .toBuffer();
 
-                    posterUrl = `/uploads/posters/${fileName}`;
+                    const uploadResult = await uploadToCloudinary(processedBuffer, "cinemix/posters", cloudinaryPublicId);
+                    posterUrl = uploadResult.secure_url;
                 }
 
                 const updateFields = [];
@@ -1629,8 +1669,8 @@ app.put("/api/updateFilm/:id", authMiddleware, adminMiddleware, upload.single('p
                     if (err) {
                         return conn.rollback(() => {
                             conn.release();
-                            if (outputPath) {
-                                fs.unlink(outputPath).catch(unlinkErr => console.error("Error deleting file:", unlinkErr));
+                            if (posterUrl) {
+                                deleteFromCloudinary(posterUrl).catch(unlinkErr => console.error("Error deleting from Cloudinary:", unlinkErr));
                             }
                             return res.status(500).json({ success: false, message: "database_error" });
                         });
@@ -1639,8 +1679,8 @@ app.put("/api/updateFilm/:id", authMiddleware, adminMiddleware, upload.single('p
                     if (result.affectedRows === 0) {
                         return conn.rollback(() => {
                             conn.release();
-                            if (outputPath) {
-                                fs.unlink(outputPath).catch(unlinkErr => console.error("Error deleting file:", unlinkErr));
+                            if (posterUrl) {
+                                deleteFromCloudinary(posterUrl).catch(unlinkErr => console.error("Error deleting from Cloudinary:", unlinkErr));
                             }
                             return res.json({ success: false, message: "film_not_found" });
                         });
@@ -1654,13 +1694,16 @@ app.put("/api/updateFilm/:id", authMiddleware, adminMiddleware, upload.single('p
                             if (err) {
                                 return conn.rollback(() => {
                                     conn.release();
-                                    if (outputPath) {
-                                        fs.unlink(outputPath).catch(unlinkErr => console.error("Error deleting file:", unlinkErr));
+                                    if (posterUrl) {
+                                        deleteFromCloudinary(posterUrl).catch(unlinkErr => console.error("Error deleting from Cloudinary:", unlinkErr));
                                     }
                                     return res.status(500).json({ success: false, message: "commit_error" });
                                 });
                             }
                             conn.release();
+                            if (oldPosterUrl) {
+                                deleteFromCloudinary(oldPosterUrl).catch(delErr => console.error("Error deleting old poster from Cloudinary:", delErr));
+                            }
                             try {
                                 await logActivity(userId, 'FILM_UPDATED');
                             } catch (logErr) {
@@ -1677,13 +1720,16 @@ app.put("/api/updateFilm/:id", authMiddleware, adminMiddleware, upload.single('p
                                 if (err) {
                                     return conn.rollback(() => {
                                         conn.release();
-                                        if (outputPath) {
-                                            fs.unlink(outputPath).catch(unlinkErr => console.error("Error deleting file:", unlinkErr));
+                                        if (posterUrl) {
+                                            deleteFromCloudinary(posterUrl).catch(unlinkErr => console.error("Error deleting from Cloudinary:", unlinkErr));
                                         }
                                         return res.status(500).json({ success: false, message: "commit_error" });
                                     });
                                 }
                                 conn.release();
+                                if (oldPosterUrl) {
+                                    deleteFromCloudinary(oldPosterUrl).catch(delErr => console.error("Error deleting old poster from Cloudinary:", delErr));
+                                }
                                 try {
                                     await logActivity(userId, 'FILM_UPDATED');
                                 } catch (logErr) {
@@ -1699,8 +1745,8 @@ app.put("/api/updateFilm/:id", authMiddleware, adminMiddleware, upload.single('p
                         if (err) {
                             return conn.rollback(() => {
                                 conn.release();
-                                if (outputPath) {
-                                    fs.unlink(outputPath).catch(unlinkErr => console.error("Error deleting file:", unlinkErr));
+                                if (posterUrl) {
+                                    deleteFromCloudinary(posterUrl).catch(unlinkErr => console.error("Error deleting from Cloudinary:", unlinkErr));
                                 }
                                 return res.status(500).json({ success: false, message: "database_error" });
                             });
@@ -1712,8 +1758,8 @@ app.put("/api/updateFilm/:id", authMiddleware, adminMiddleware, upload.single('p
                             if (err) {
                                 return conn.rollback(() => {
                                     conn.release();
-                                    if (outputPath) {
-                                        fs.unlink(outputPath).catch(unlinkErr => console.error("Error deleting file:", unlinkErr));
+                                    if (posterUrl) {
+                                        deleteFromCloudinary(posterUrl).catch(unlinkErr => console.error("Error deleting from Cloudinary:", unlinkErr));
                                     }
                                     return res.status(500).json({ success: false, message: "database_error" });
                                 });
@@ -1728,8 +1774,8 @@ app.put("/api/updateFilm/:id", authMiddleware, adminMiddleware, upload.single('p
                         if (err) {
                             return conn.rollback(() => {
                                 conn.release();
-                                if (outputPath) {
-                                    fs.unlink(outputPath).catch(unlinkErr => console.error("Error deleting file:", unlinkErr));
+                                if (posterUrl) {
+                                    deleteFromCloudinary(posterUrl).catch(unlinkErr => console.error("Error deleting from Cloudinary:", unlinkErr));
                                 }
                                 return res.status(500).json({ success: false, message: "database_error" });
                             });
@@ -1743,8 +1789,8 @@ app.put("/api/updateFilm/:id", authMiddleware, adminMiddleware, upload.single('p
                                     if (err) {
                                         return conn.rollback(() => {
                                             conn.release();
-                                            if (outputPath) {
-                                                fs.unlink(outputPath).catch(unlinkErr => console.error("Error deleting file:", unlinkErr));
+                                            if (posterUrl) {
+                                                deleteFromCloudinary(posterUrl).catch(unlinkErr => console.error("Error deleting from Cloudinary:", unlinkErr));
                                             }
                                             return res.status(500).json({ success: false, message: "database_error" });
                                         });
