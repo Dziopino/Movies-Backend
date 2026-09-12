@@ -8,8 +8,9 @@
 [![MySQL](https://img.shields.io/badge/MySQL-8.0-4479A1?logo=mysql&logoColor=white)](https://www.mysql.com/)
 [![JWT](https://img.shields.io/badge/JWT-auth-000000?logo=jsonwebtokens&logoColor=white)](https://jwt.io/)
 [![bcrypt](https://img.shields.io/badge/bcrypt-hashing-6A5ACD)](https://www.npmjs.com/package/bcrypt)
+[![Cloudinary](https://img.shields.io/badge/Cloudinary-image_storage-3448C5?logo=cloudinary&logoColor=white)](https://cloudinary.com/)
 
-**Express · MySQL · JWT · bcrypt · RBAC · Server-Side Pagination**
+**Express · MySQL · JWT · bcrypt · RBAC · Cloudinary · Server-Side Pagination**
 
 [Frontend Repo](https://github.com/Dziopino/Movies-Frontend) · [Backend Repo](https://github.com/Dziopino/Movies-Backend) · [Live Demo](https://cinemix.xyz) · [API Docs](#-api-reference)
 
@@ -65,6 +66,7 @@ This repository is designed to pair with the [Movies-Frontend](https://github.co
 | **bcrypt** | ^6.0.0 | Secure password hashing (salted) |
 | **multer** | ^2.2.0 | In-memory multipart upload handling |
 | **sharp** | ^0.35.2 | High-performance image processing (WebP compression) |
+| **cloudinary** | ^2.6.0 | Cloud image storage, delivery, and lifecycle management |
 | **resend** | ^6.26.0 | HTTPS-based transactional email API (replaces SMTP) |
 | **helmet** | ^8.3.0 | HTTP security headers (CSP, HSTS, X-Frame-Options) |
 | **express-rate-limit** | ^8.7.0 | API rate limiting (global: 750 req/15min, auth: 10 req/15min) |
@@ -137,11 +139,12 @@ The API implements a **three-tier middleware cascade** that progressively escala
 - **multer** accepts files into memory (`memoryStorage`) — no temporary disk writes.
 - **File filter** rejects non-image MIME types.
 - **Size cap**: 2 MB hard limit (`MulterError` handling).
-- **sharp** resizes images:
+- **sharp** resizes images in-memory:
     - **Avatars**: 300×300 cover-fit, WebP quality 80
     - **Film posters**: 200×285 cover-fit, WebP quality 90
-- **Old avatar cleanup**: On successful upload, the previous avatar file is deleted from disk to prevent storage bloat.
-- **Poster storage**: Film posters are saved to `uploads/posters/` and served via express.static middleware at `/uploads` endpoint.
+- **Cloudinary upload**: Compressed buffers are streamed directly to Cloudinary via `upload_stream` (no local file writes).
+- **Old image cleanup**: On avatar replacement, film poster replacement, or film deletion, the previous Cloudinary asset is destroyed via `deleteFromCloudinary` to prevent storage bloat.
+- **URL resolution**: All image URLs returned by the API are full Cloudinary HTTPS URLs. The frontend uses a `resolveImageUrl()` helper for backward compatibility with any legacy local paths.
 
 ### Token-Based Password Reset
 - **Generation**: `crypto.randomBytes(32)` produces a 64-character hex token.
@@ -210,6 +213,7 @@ SUSPENDED ──unsuspend()──► ACTIVE    │
 | `isPasswordValid` | `utils/passwordValidator.js` | Enforces complexity: ≥8 chars, uppercase, lowercase, digit, special character. |
 | `loadLanguages` / `isLanguageValid` | `utils/languageValidator.js` | Caches language codes at boot time to avoid repeated DB hits. |
 | `logActivity` | `utils/activityLogger.js` | Logs user/admin actions to `user_activity` table for audit trail. |
+| `uploadToCloudinary` / `deleteFromCloudinary` | `utils/cloudinary.js` | Cloudinary SDK wrapper: buffer upload via `upload_stream` and asset deletion by URL parsing. |
 
 ---
 
@@ -234,13 +238,13 @@ SUSPENDED ──unsuspend()──► ACTIVE    │
 | `POST` | `/api/editUserBio` | JWT | Updates biography text. |
 | `POST` | `/api/editUserName` | JWT | Updates display name. |
 | `POST` | `/api/changeUserLanguage` | JWT | Updates preferred UI locale; validated against cached language codes. |
-| `POST` | `/api/uploadAvatar` | JWT + multer | Accepts image ≤2 MB; compresses to 300×300 WebP; replaces old file. |
+| `POST` | `/api/uploadAvatar` | JWT + multer | Accepts image ≤2 MB; compresses to 300×300 WebP via sharp; uploads to Cloudinary; deletes old avatar from cloud. |
 
 ### Film Catalog (Public)
 
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
-| `POST` | `/getFilms` | Optional | Paginated catalog (20/page) with optional `LIKE` search on localized titles. Returns favorite/watched state if authenticated. |
+| `POST` | `/getFilms` | Optional | Paginated catalog (20/page) with optional `LIKE` search on localized titles and `genreName` filter (server-side via `HAVING` + `FIND_IN_SET`). Returns favorite/watched state if authenticated. |
 | `GET` | `/getFilm/:id` | Optional | Single film detail with genre aggregation (`GROUP_CONCAT`) and user-specific state. |
 | `GET` | `/getLanguageCodes` | — | Returns all supported language codes (cached at boot). |
 
@@ -250,8 +254,8 @@ SUSPENDED ──unsuspend()──► ACTIVE    │
 |--------|----------|------|-------------|
 | `POST` | `/likeToggle` | JWT | Idempotent favorite toggle (INSERT or DELETE on `user_favorites`). |
 | `POST` | `/watchedToggle` | JWT | Idempotent watched toggle (INSERT or DELETE on `user_watched`). |
-| `POST` | `/likedGet` | JWT | Paginated favorites list with localized metadata. |
-| `POST` | `/watchedGet` | JWT | Paginated watched list with localized metadata. |
+| `POST` | `/likedGet` | JWT | Paginated favorites list with localized metadata and optional `genreName` filter. |
+| `POST` | `/watchedGet` | JWT | Paginated watched list with localized metadata and optional `genreName` filter. |
 
 ### Admin — User Management
 
@@ -284,9 +288,9 @@ SUSPENDED ──unsuspend()──► ACTIVE    │
 | `GET` | `/getFilmTranslations/:id` | Admin | Returns all translations for a specific film with language codes, titles, and descriptions. |
 | `GET` | `/getFilmGenres/:id` | Admin | Returns all genres assigned to a specific film. |
 | `GET` | `/getAllGenresList` | Admin | Returns complete list of all available genres for film assignment. |
-| `POST` | `/addFilm` | Admin + multer | Creates film with multipart poster upload (200×285 WebP), metadata validation (rating 0-10, duration), multi-language translations, genre associations, and duplicate language prevention. |
-| `PUT` | `/updateFilm/:id` | Admin + multer | Updates film metadata (rating, release date, duration), optionally uploads new poster, replaces all translations, and reassigns genres. Uses SQL transactions for atomic updates. |
-| `POST` | `/deleteFilm` | Admin + password | Deletes film record. Requires admin password re-verification. |
+| `POST` | `/addFilm` | Admin + multer | Creates film with multipart poster upload (sharp → 200×285 WebP → Cloudinary), metadata validation (rating 1-10, duration), multi-language translations, genre associations, and duplicate language prevention. |
+| `PUT` | `/updateFilm/:id` | Admin + multer | Updates film metadata (rating, release date, duration), optionally uploads new poster to Cloudinary (deletes old), replaces all translations, and reassigns genres. Uses SQL transactions for atomic updates. |
+| `POST` | `/deleteFilm` | Admin + password | Deletes film record and its poster from Cloudinary. Requires admin password re-verification. |
 | `POST` | `/addAdmin` | Admin | Creates new user with `role = 1` directly. Validates password complexity and email uniqueness. |
 
 ### Admin — Dashboard Analytics
@@ -302,8 +306,8 @@ SUSPENDED ──unsuspend()──► ACTIVE    │
 
 ## ✨ Key Features
 
-### Server-Side Pagination & Search
-All list endpoints (`getFilms`, `getUsers`, `getGenres`, `likedGet`, `watchedGet`, `audit-logs`) implement consistent pagination via `LIMIT`/`OFFSET` with parallel `COUNT(*)` queries for total page calculation. Search is delegated to SQL `LIKE` with parameterized values, preventing unbounded result sets from reaching the client.
+### Server-Side Pagination, Search & Genre Filtering
+All list endpoints (`getFilms`, `getUsers`, `getGenres`, `likedGet`, `watchedGet`, `audit-logs`) implement consistent pagination via `LIMIT`/`OFFSET` with parallel `COUNT(*)` queries for total page calculation. Search is delegated to SQL `LIKE` with parameterized values, preventing unbounded result sets from reaching the client. Film catalog endpoints additionally support server-side genre filtering via `genreName` parameter using `HAVING` + `FIND_IN_SET` on aggregated genre names, ensuring pagination counts reflect filtered results accurately.
 
 ### Activity Logging Architecture
 Comprehensive audit trail implemented via `user_activity` table capturing 25+ distinct action types (e.g., `FILM_LIKED`, `USER_LOGGED_IN`, `USER_BANNED`) with associated `user_id` and timestamp. Used by both user profile history and admin dashboard analytics. Includes a dedicated endpoint for paginated and filterable administrative review.
@@ -336,17 +340,16 @@ backend/
 ├── utils/
 │   ├── activityLogger.js       # User activity logging for audit trail
 │   ├── checkIfUserIsAdmin.js   # Async role verification
+│   ├── cloudinary.js           # Cloudinary SDK wrapper (upload/delete)
 │   ├── generateToken.js        # JWT signing utility
 │   ├── languageValidator.js    # Language cache + validation
 │   ├── passwordHasher.js       # bcrypt hashing wrapper
 │   └── passwordValidator.js    # Complexity rule engine
+├── scripts/
+│   └── migrate-to-cloudinary.js # One-time migration: local uploads → Cloudinary
 ├── database/
 │   └── cinemix.sql             # Database schema
 ├── public/                     # Static assets (legacy)
-├── uploads/                    # Processed WebP avatars and film posters
-│   ├── [avatars].webp         # User profile pictures (300×300)
-│   └── posters/               # Film posters (200×285)
-│       └── [posters].webp
 ├── routes/                     # Reserved for future controller extraction
 ├── views/                      # Pug templates (legacy / unused)
 ├── database.js                 # MySQL connection singleton
@@ -451,6 +454,11 @@ JWT_EXPIRES_IN=7d
 
 # Email (Resend API)
 RESEND_API_KEY=re_xxxxxxxxxxxxxxxxxxxxx
+
+# Cloudinary (Image Storage)
+CLOUDINARY_CLOUD_NAME=your_cloud_name
+CLOUDINARY_API_KEY=your_api_key
+CLOUDINARY_API_SECRET=your_api_secret
 
 # CORS & Frontend
 FRONTEND_URL=http://localhost:5173
